@@ -76,7 +76,7 @@ func (g *Gadget) setOutput(pin string, c *wire) {
 		if _, ok := outputs[ppfv[1]]; ok {
 			glog.Fatalf("output already connected: %s.%s", g.name, pin)
 		}
-		outputs[ppfv[1]] = c
+		outputs[ppfv[1]] = c.channel
 	}
 	c.senders++
 	g.outputs[pin] = c

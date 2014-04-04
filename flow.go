@@ -36,9 +36,14 @@ type Tag struct {
 type Input <-chan Message
 
 // Output pins are used to send messages elsewhere.
-type Output interface {
-	Send(v Message) // Send a message through an output pin.
-	Disconnect()    // Disconnect the pin, close channel when last one is gone.
+type Output chan<- Message
+
+func (c Output) Send(v Message) {
+	c <- v
+}
+
+func (c Output) Disconnect() {
+	close(c)
 }
 
 // Circuitry is the collective name for circuits and gadgets.
