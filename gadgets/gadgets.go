@@ -37,7 +37,7 @@ func init() {
 // A sink eats up all the messages it receives. Registers as "Sink".
 type Sink struct {
 	flow.Gadget
-	In  flow.Input
+	In flow.Input
 }
 
 // Start reading messages and discard them.

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	// "io/ioutil"
 	"os"
-	"reflect"
+	// "reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -43,7 +43,7 @@ type Circuitry interface {
 	Run()
 
 	initGadget(Circuitry, string, *Circuit) *Gadget
-	pinValue(name string) reflect.Value
+	initPins()
 }
 
 // A wire is a ref-counted Input, it's closed when the count drops to 0.
@@ -65,17 +65,17 @@ type wire struct {
 // 	}
 // }
 
-// extract "a" from "a.b", panics if there's no dot in the string
-func gadgetPart(s string) string {
-	n := strings.IndexRune(s, '.')
-	return s[:n]
-}
+// // extract "a" from "a.b", panics if there's no dot in the string
+// func gadgetPart(s string) string {
+// 	n := strings.IndexRune(s, '.')
+// 	return s[:n]
+// }
 
-// extract "b" from "a.b", also works if only "b" is given
-func pinPart(s string) string {
-	n := strings.IndexRune(s, '.')
-	return s[n+1:]
-}
+// // extract "b" from "a.b", also works if only "b" is given
+// func pinPart(s string) string {
+// 	n := strings.IndexRune(s, '.')
+// 	return s[n+1:]
+// }
 
 // Utility to check for errors, report as fatal error if the arg is not nil.
 func Check(err interface{}) {

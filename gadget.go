@@ -12,13 +12,14 @@ type Gadget struct {
 	circuitry Circuitry                // pointer to self as Circuitry object
 	name      string                   // name of this gadget in the circuit
 	owner     *Circuit                 // owning circuit
+	regType   string                   // type, as listed in the registry
 	inputs    map[string]reflect.Value // input pins
 	outputs   map[string]reflect.Value // output pins
 }
 
 // Disconnect an output channel, closing it when all refs are gone.
 func (g *Gadget) Disconnect(c Output) {
-	glog.Errorln("disconnect");
+	glog.Errorln("disconnect")
 }
 
 func (g *Gadget) initGadget(c Circuitry, n string, o *Circuit) *Gadget {
@@ -33,23 +34,39 @@ func (g *Gadget) initGadget(c Circuitry, n string, o *Circuit) *Gadget {
 	return g
 }
 
-func (g *Gadget) gadgetValue() reflect.Value {
-	return reflect.ValueOf(g.circuitry).Elem()
+func (g *Gadget) initPins() {
+	gv := reflect.ValueOf(g.circuitry).Elem()
+	for i := 0; i < gv.NumField(); i++ {
+		ft := gv.Type().Field(i)
+		fv := gv.Field(i)
+		switch fv.Type().String() {
+		case "flow.Input":
+			g.inputs[ft.Name] = fv
+		case "flow.Output":
+			g.outputs[ft.Name] = fv
+		}
+	}
+	glog.Errorln("inputs", g.inputs)
+	glog.Errorln("outputs", g.outputs)
 }
 
-func (g *Gadget) pinValue(pin string) reflect.Value {
-	pp := pinPart(pin)
-	// if it's a circuit, look up mapped pins
-	if g, ok := g.circuitry.(*Circuit); ok {
-		p := g.labels[pp]
-		return g.gadgetOf(p).circuitry.pinValue(p) // recursive
-	}
-	fv := g.gadgetValue().FieldByName(pp)
-	if !fv.IsValid() {
-		glog.Fatalln("pin not found:", pin)
-	}
-	return fv
-}
+// func (g *Gadget) gadgetValue() reflect.Value {
+// 	return reflect.ValueOf(g.circuitry).Elem()
+// }
+
+// func (g *Gadget) pinValue(pin string) reflect.Value {
+// 	pp := pinPart(pin)
+// 	// if it's a circuit, look up mapped pins
+// 	if g, ok := g.circuitry.(*Circuit); ok {
+// 		p := g.labels[pp]
+// 		return g.gadgetOf(p).circuitry.pinValue(p) // recursive
+// 	}
+// 	fv := g.gadgetValue().FieldByName(pp)
+// 	if !fv.IsValid() {
+// 		glog.Fatalln("pin not found:", pin)
+// 	}
+// 	return fv
+// }
 
 // func (g *Gadget) getInput(pin string, capacity int) *wire {
 // 	c := g.inputs[pin]
