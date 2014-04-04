@@ -22,7 +22,7 @@ type transformer struct {
 func (g *transformer) Run() {
 	for m := range g.In {
 		// if m, ok := <-g.In; ok {
-		g.Out.Send(g.fun(m))
+		g.Out <- g.fun(m)
 	}
 }
 

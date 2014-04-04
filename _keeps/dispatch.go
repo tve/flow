@@ -50,7 +50,7 @@ func (g *dispatchHead) Run() {
 			}
 
 			// send (unique!) marker and act on it once it comes back on Reply
-			g.Feeds[gadget].Send(Tag{"<marker>", g.owner})
+			g.Feeds[gadget] <- Tag{"<marker>", g.owner}
 			<-g.Reply // TODO: add a timeout?
 
 			// perform the switch, now that previous output has drained
@@ -58,7 +58,7 @@ func (g *dispatchHead) Run() {
 			if g.Feeds[gadget] == nil {
 				if Registry[prefix+gadget] == nil {
 					glog.Warningln("cannot dispatch:", prefix+gadget)
-					g.Rej.Send(tag) // report that no such gadget was found
+					g.Rej <- tag // report that no such gadget was found
 					gadget = ""
 				} else { // create, hook up, and launch the new gadget
 					glog.Infoln("dispatching to:", prefix+gadget)
@@ -71,7 +71,7 @@ func (g *dispatchHead) Run() {
 			}
 
 			// pass through a "consumed" dispatch tag
-			g.Feeds[""].Send(Tag{"<dispatched>", gadget})
+			g.Feeds[""] <- Tag{"<dispatched>", gadget}
 			continue
 		}
 
@@ -79,7 +79,7 @@ func (g *dispatchHead) Run() {
 		if feed == nil {
 			feed = g.Rej
 		}
-		feed.Send(m)
+		feed <- m
 	}
 }
 
@@ -93,9 +93,9 @@ type dispatchTail struct {
 func (g *dispatchTail) Run() {
 	for m := range g.In {
 		if tag, ok := m.(Tag); ok && tag.Tag == "<marker>" && tag.Msg == g.owner {
-			g.Back.Send(m)
+			g.Back <- m
 		} else {
-			g.Out.Send(m)
+			g.Out <- m
 		}
 	}
 }

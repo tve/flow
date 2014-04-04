@@ -6,8 +6,8 @@ implementation - see also https://en.wikipedia.org/wiki/Flow-based_programming.
 
 The flow library is available as import, along with some supporting packages:
 
-    import "github.com/jcw/flow"
-    import _ "github.com/jcw/flow/gadgets"
+    import "github.com/jcw/flow-dev"
+    import _ "github.com/jcw/flow-dev/gadgets"
 
 The "gadgets" package is loaded only for its side-effects here: defining some
 basic gadgets in the registry.
@@ -66,7 +66,7 @@ Te define your own gadget, create a type which embeds Gadget and defines Run():
     func (w *LineLengths) Run() {
         for m := range w.In {
             s := m.(string)     // needs a type assertion
-            w.Out.Send(len(s))
+            w.Out <- len(s)
         }
     }
 

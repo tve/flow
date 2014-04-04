@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jcw/flow"
+	"github.com/jcw/flow-dev"
 )
 
 func init() {
@@ -43,7 +43,7 @@ type Sink struct {
 
 // Start reading messages and discard them.
 func (w *Sink) Run() {
-	w.Out.Disconnect()
+	close(w.Out)
 	for _ = range w.In {
 	}
 }
@@ -58,7 +58,7 @@ type Pipe struct {
 // Start passing through messages.
 func (w *Pipe) Run() {
 	for m := range w.In {
-		w.Out.Send(m)
+		w.Out <- m
 	}
 }
 
@@ -81,7 +81,7 @@ func (w *Repeater) Run() {
 				count = 1 // don't repeat tags, just pass them through
 			}
 			for i := 0; i < count; i++ {
-				w.Out.Send(m)
+				w.Out <- m
 			}
 		}
 	}
@@ -101,12 +101,12 @@ type Counter struct {
 func (w *Counter) Run() {
 	for m := range w.In {
 		if _, ok := m.(flow.Tag); ok {
-			w.Out.Send(m) // don't count tags, just pass them through
+			w.Out <- m // don't count tags, just pass them through
 		} else {
 			w.count++
 		}
 	}
-	w.Out.Send(w.count)
+	w.Out <- w.count
 }
 
 // Printers report the messages sent to them as output. Registers as "Printer".
@@ -136,7 +136,7 @@ func (w *Timer) Run() {
 		rate, err := time.ParseDuration(r.(string))
 		flow.Check(err)
 		t := <-time.After(rate)
-		w.Out.Send(t)
+		w.Out <- t
 	}
 }
 
@@ -156,7 +156,7 @@ func (w *Clock) Run() {
 		t := time.NewTicker(rate)
 		defer t.Stop()
 		for m := range t.C {
-			w.Out.Send(m)
+			w.Out <- m
 		}
 	}
 }
@@ -173,7 +173,7 @@ type FanOut struct {
 func (w *FanOut) Run() {
 	for m := range w.In {
 		for _, o := range w.Out {
-			o.Send(m)
+			o <- m
 		}
 	}
 }
@@ -202,7 +202,7 @@ func (g *Delay) Run() {
 	delay, _ := time.ParseDuration((<-g.Delay).(string))
 	for m := range g.In {
 		time.Sleep(delay)
-		g.Out.Send(m)
+		g.Out <- m
 	}
 }
 
@@ -216,8 +216,8 @@ type TimeStamp struct {
 // Start inserting timestamps.
 func (w *TimeStamp) Run() {
 	for m := range w.In {
-		w.Out.Send(time.Now())
-		w.Out.Send(m)
+		w.Out <- time.Now()
+		w.Out <- m
 	}
 }
 
@@ -236,13 +236,13 @@ func (w *ReadFileText) Run() {
 			file, err := os.Open(name)
 			flow.Check(err)
 			scanner := bufio.NewScanner(file)
-			w.Out.Send(flow.Tag{"<open>", name})
+			w.Out <- flow.Tag{"<open>", name}
 			for scanner.Scan() {
-				w.Out.Send(scanner.Text())
+				w.Out <- scanner.Text()
 			}
-			w.Out.Send(flow.Tag{"<close>", name})
+			w.Out <- flow.Tag{"<close>", name}
 		} else {
-			w.Out.Send(m)
+			w.Out <- m
 		}
 	}
 }
@@ -261,13 +261,13 @@ func (w *ReadFileJSON) Run() {
 		if name, ok := m.(string); ok {
 			data, err := ioutil.ReadFile(name)
 			flow.Check(err)
-			w.Out.Send(flow.Tag{"<file>", name})
+			w.Out <- flow.Tag{"<file>", name}
 			var any interface{}
 			err = json.Unmarshal(data, &any)
 			flow.Check(err)
 			m = any
 		}
-		w.Out.Send(m)
+		w.Out <- m
 	}
 }
 
@@ -291,7 +291,7 @@ func (g *EnvVar) Run() {
 				m = v.Msg
 			}
 		}
-		g.Out.Send(m)
+		g.Out <- m
 	}
 }
 
@@ -338,7 +338,7 @@ func (g *CmdLine) Run() {
 		if step > 1 {
 			value = flow.Tag{flag.Arg(i), value}
 		}
-		g.Out.Send(value)
+		g.Out <- value
 	}
 }
 
@@ -355,13 +355,13 @@ type Concat3 struct {
 // Start waiting from each pin, moving on to the next when the channel closes.
 func (g *Concat3) Run() {
 	for m := range g.In1 {
-		g.Out.Send(m)
+		g.Out <- m
 	}
 	for m := range g.In2 {
-		g.Out.Send(m)
+		g.Out <- m
 	}
 	for m := range g.In3 {
-		g.Out.Send(m)
+		g.Out <- m
 	}
 }
 
@@ -378,7 +378,7 @@ func (g *AddTag) Run() {
 	tag := (<-g.Tag).(string)
 	for m := range g.In {
 		if _, ok := m.(flow.Tag); !ok {
-			g.Out.Send(flow.Tag{tag, m})
+			g.Out <- flow.Tag{tag, m}
 		}
 	}
 }

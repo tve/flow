@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/jcw/flow"
-	_ "github.com/jcw/flow/gadgets"
+	"github.com/jcw/flow-dev"
+	_ "github.com/jcw/flow-dev/gadgets"
 )
 
 var (
@@ -20,15 +20,15 @@ var (
 func main() {
 	flag.Parse()
 
-	err := flow.AddToRegistry(*setupFile)
-	if err != nil && !*verbose {
-		glog.Fatal(err)
-	}
+	// err := flow.AddToRegistry(*setupFile)
+	// if err != nil && !*verbose {
+	// 	glog.Fatal(err)
+	// }
 
 	if *verbose {
 		fmt.Println("Flow", flow.Version, "\n")
 		flow.PrintRegistry()
-		fmt.Println("\nDocumentation at http://godoc.org/github.com/jcw/flow")
+		fmt.Println("\nDocumentation at http://godoc.org/github.com/jcw/flow-dev")
 	} else {
 		glog.Infof("Flow %s - starting, registry size %d",
 			flow.Version, len(flow.Registry))

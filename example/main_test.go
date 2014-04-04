@@ -1,6 +1,6 @@
 package main
 
-import "github.com/jcw/flow"
+import "github.com/jcw/flow-dev"
 
 func Example() {
 	g := flow.NewCircuit()

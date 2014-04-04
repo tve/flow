@@ -1,10 +1,10 @@
 package flow_test
 
 import (
-	"strings"
+	// "strings"
 
-	"github.com/jcw/flow"
-	_ "github.com/jcw/flow/gadgets"
+	"github.com/jcw/flow-dev"
+	_ "github.com/jcw/flow-dev/gadgets"
 )
 
 func ExampleNewCircuit() {
@@ -12,25 +12,25 @@ func ExampleNewCircuit() {
 	g.Run()
 }
 
-func ExampleTransformer() {
-	upper := flow.Transformer(func(m flow.Message) flow.Message {
-		return strings.ToUpper(m.(string))
-	})
-
-	g := flow.NewCircuit()
-	g.AddCircuitry("u", upper)
-	g.Feed("u.In", "abc")
-	g.Feed("u.In", "def")
-	g.Run()
-	// Output:
-	// Lost string: ABC
-	// Lost string: DEF
-}
+// func ExampleTransformer() {
+// 	upper := flow.Transformer(func(m flow.Message) flow.Message {
+// 		return strings.ToUpper(m.(string))
+// 	})
+// 
+// 	g := flow.NewCircuit()
+// 	g.AddCircuitry("u", upper)
+// 	g.Feed("u.In", "abc")
+// 	g.Feed("u.In", "def")
+// 	g.Run()
+// 	// Output:
+// 	// Lost string: ABC
+// 	// Lost string: DEF
+// }
 
 // func ExampleRunner() {
 // 	desc := "foo: bar\nInput: In \nOutput:  Out\n\nhaha\nyes!"
 // 	upper := flow.Runner(desc, func(in flow.Input, out flow.Output) {
-// 		out.Send(strings.ToUpper((<-in).(string)))
+// 		out <- strings.ToUpper((<-in).(string))
 // 	})
 //
 // 	g := flow.NewCircuit()

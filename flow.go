@@ -38,14 +38,6 @@ type Input <-chan Message
 // Output pins are used to send messages elsewhere.
 type Output chan<- Message
 
-func (c Output) Send(v Message) {
-	c <- v
-}
-
-func (c Output) Disconnect() {
-	close(c)
-}
-
 // Circuitry is the collective name for circuits and gadgets.
 type Circuitry interface {
 	Run()
@@ -62,25 +54,16 @@ type wire struct {
 	dest     *Gadget
 }
 
-func (c *wire) Send(v Message) {
-	c.dest.sendTo(c, v)
-}
-
-func (c *wire) Disconnect() {
-	c.senders--
-	if c.senders == 0 && c.channel != nil {
-		close(c.channel)
-	}
-}
-
-// Use a fake sink for every output pin not connected to anything else.
-type fakeSink struct{}
-
-func (c *fakeSink) Send(m Message) {
-	fmt.Printf("Lost %T: %v\n", m, m)
-}
-
-func (c *fakeSink) Disconnect() {}
+// func (c *wire) Send(v Message) {
+// 	c.dest.sendTo(c, v)
+// }
+// 
+// func (c *wire) Disconnect() {
+// 	c.senders--
+// 	if c.senders == 0 && c.channel != nil {
+// 		close(c.channel)
+// 	}
+// }
 
 // extract "a" from "a.b", panics if there's no dot in the string
 func gadgetPart(s string) string {

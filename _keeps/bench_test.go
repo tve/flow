@@ -3,8 +3,8 @@ package flow_test
 import (
 	"testing"
 
-	"github.com/jcw/flow"
-	_ "github.com/jcw/flow/gadgets"
+	"github.com/jcw/flow-dev"
+	_ "github.com/jcw/flow-dev/gadgets"
 )
 
 func BenchmarkRepeat0(b *testing.B) {

@@ -118,7 +118,7 @@ func (g *Gadget) setupChannels() {
 			}
 		case "flow.Output":
 			if field.IsNil() {
-				setValue(field, &fakeSink{})
+				// FIXME: setValue(field, &fakeSink{})
 			}
 		}
 	}
@@ -135,7 +135,7 @@ func (g *Gadget) isFinished() bool {
 
 func (g *Gadget) closeChannels() {
 	for _, wire := range g.outputs {
-		wire.Disconnect()
+		close(wire.channel)
 	}
 	for _, wire := range g.inputs {
 		// close channel if not nil and not already closed
