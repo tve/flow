@@ -3,22 +3,25 @@ package flow
 import (
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/golang/glog"
 )
 
+var nullChan = make(chan Message)
+
+func init() {
+	// set up a null channel which always returns eof
+	close(nullChan)
+}
+
 // Initialise a new circuit.
 func NewCircuit() *Circuit {
-	c := Circuit{
+	return &Circuit{
 		gadgets: map[string]*Gadget{},
 		wires:   map[string]int{},
 		feeds:   map[string][]Message{},
 		labels:  map[string]string{},
-		null:    make(chan Message),
 	}
-	close(c.null)
-	return &c
 }
 
 // A circuit is a collection of inter-connected gadgets.
@@ -29,11 +32,7 @@ type Circuit struct {
 	wires   map[string]int       // all wire definitions
 	feeds   map[string][]Message // all message feeds
 	labels  map[string]string    // pin label lookup map
-
-	null chan Message // used for dangling inputs
-	sink chan Message // used for dangling outputs
-
-	wait sync.WaitGroup // tracks number of running gadgets
+	admin   chan Message		 // admin channel while running
 }
 
 func (c *Circuit) initPins() {
@@ -55,7 +54,7 @@ func (c *Circuit) Add(name, gadget string) {
 
 // Add a gadget or circuit to the circuit with a unique name.
 func (c *Circuit) AddCircuitry(name string, circ Circuitry) *Gadget {
-	g := circ.initGadget(circ, name, c)
+	g := circ.initGadget(circ, name)
 	c.gadgets[name] = g
 	circ.initPins()
 	return g
@@ -63,9 +62,6 @@ func (c *Circuit) AddCircuitry(name string, circ Circuitry) *Gadget {
 
 // Connect an output pin with an input pin.
 func (c *Circuit) Connect(from, to string, capacity int) {
-	// c.wires = append(c.wires, wireDef{from, to, capacity})
-	// w := c.gadgetOf(to).getInput(pinPart(to), capacity)
-	// c.gadgetOf(from).setOutput(pinPart(from), w)
 	c.wires[from+"/"+to] = capacity
 }
 
@@ -88,22 +84,29 @@ type wire struct {
 	channel chan Message
 }
 
+type adminMsg struct {
+	g *Gadget
+	o Output
+}
+
 // Start up the circuit, and return when it is finished.
 func (c *Circuit) Run() {
 	inbound := map[string]*wire{}
 	outbound := map[string]*wire{}
 
-	glog.Errorln("feeds", c.name, len(c.feeds))
+	// start by creating channels large enough to contain the feed data
+	glog.Errorln("c-init", c.name, len(c.feeds))
 	for k, v := range c.feeds {
 		inbound[k] = &wire{channel: make(chan Message, len(v))}
 	}
 
+	// collect all wire endpoints, increasing wire capacities as needed
 	glog.Errorln("wires", c.name, len(c.wires))
 	for wpair, wcap := range c.wires {
 		v := strings.Split(wpair, "/")
 		from := v[0]
 		to := v[1]
-
+		glog.Errorln("wire", wpair, wcap)
 		if _, ok := inbound[to]; !ok {
 			inbound[to] = &wire{}
 		}
@@ -114,31 +117,31 @@ func (c *Circuit) Run() {
 		outbound[from] = in
 	}
 
-	glog.Errorln("fill", c.name)
+	// push the feed dato into the channels
+	glog.Errorln("feeds", c.name, len(c.feeds))
 	for k, v := range c.feeds {
+		glog.Errorln("feed", k, v)
 		for _, f := range v {
 			inbound[k].channel <- f
 		}
 	}
 
-	glog.Errorln("sink", c.name)
-	c.sink = make(chan Message)
-	go func() {
-		for m := range c.sink {
-			glog.Errorln("lost:", c.name, m)
-		}
-	}()
-
-	glog.Errorln("gadgets", c.name, len(c.wires))
+	// set up an admin channel for communication from gadgets to this circuit
+	glog.Errorln("admin", c.name)
+	c.admin = make(chan Message)
+	count := len(c.gadgets)
+	
+	// set up all the gadgets and start them up
+	glog.Errorln("gadgets", c.name, len(c.gadgets))
 	for _, g := range c.gadgets {
-		c.wait.Add(1)
-
+		g.admin = c.admin
+		
 		glog.Errorln("g-in", g.name, len(g.inputs))
 		for k, v := range g.inputs {
 			if in, ok := inbound[k]; ok {
 				setPin(v, in.channel)
 			} else {
-				setPin(v, c.null) // feed eof to unconnected inputs
+				setPin(v, nullChan) // feed eof to unconnected inputs
 			}
 		}
 
@@ -148,7 +151,7 @@ func (c *Circuit) Run() {
 				out.fanIn++
 				setPin(v, out.channel)
 			} else {
-				setPin(v, c.sink) // ignore data from unconnected outputs
+				setPin(v, c.admin) // ignore data from unconnected outputs
 			}
 		}
 
@@ -162,22 +165,37 @@ func (c *Circuit) Run() {
 		glog.Errorln("g-go", g.name)
 		go func() {
 			defer DontPanic()
-			defer c.wait.Done()
-			defer c.teardownPins(g)
+			defer func() {
+				c.admin <- adminMsg{g: g}
+			}()
 
 			glog.Errorln("g-run", g.name)
 			g.circuitry.Run()
 			glog.Errorln("g-end", g.name)
 		}()
 	}
-	c.wait.Wait()
+	
+	// listen for incoming admin requests until all gadgets have finished
+	if count > 0 { // TODO: this check can probably move up
+		for m := range c.admin {
+			glog.Errorln("g-admin", m)
+			if a, ok := m.(adminMsg); ok {
+				// also use for disconnects and live circuit rewiring?
+				glog.Errorln("g-finish", a.g.name)
+				// teardown pins
+				count--
+				if count == 0 {
+					close(c.admin) // will terminate the loop
+				}
+			} else {
+				// all other messages are from unconnected output pins
+				glog.Errorln("lost:", c.name, m)
+			}
+		}
+	}
+	
 	glog.Errorln("g-done", c.name)
-	close(c.sink)
-	c.sink = nil // this also marks the circuit as not running
-	// clean up all channels
-}
-
-func (c *Circuit) teardownPins(g *Gadget) {
+	c.admin = nil // this also marks the circuit as not running
 }
 
 func setPin(v reflect.Value, c chan Message) {

@@ -42,7 +42,7 @@ type Output chan<- Message
 type Circuitry interface {
 	Run()
 
-	initGadget(Circuitry, string, *Circuit) *Gadget
+	initGadget(Circuitry, string) *Gadget
 	initPins()
 }
 

@@ -11,7 +11,7 @@ import (
 type Gadget struct {
 	circuitry Circuitry                // pointer to self as Circuitry object
 	name      string                   // name of this gadget in the circuit
-	owner     *Circuit                 // owning circuit
+	admin     chan Message             // for communication with owning circuit
 	regType   string                   // type, as listed in the registry
 	inputs    map[string]reflect.Value // input pins
 	outputs   map[string]reflect.Value // output pins
@@ -19,16 +19,18 @@ type Gadget struct {
 
 // Disconnect an output channel, closing it when all refs are gone.
 func (g *Gadget) Disconnect(c Output) {
-	glog.Errorln("disconnect")
+	if g.admin != nil {
+		glog.Errorln("disconnect", g.name)
+		g.admin <- adminMsg{g: g, o: c}
+	} else {
+		glog.Errorln("close", g.name)
+		close(c) // not inside cicuit, assume we should just close the channel
+	}
 }
 
-func (g *Gadget) initGadget(c Circuitry, n string, o *Circuit) *Gadget {
-	if g.owner != nil {
-		glog.Fatalln("gadget is already in use:", n)
-	}
+func (g *Gadget) initGadget(c Circuitry, n string) *Gadget {
 	g.circuitry = c
 	g.name = n
-	g.owner = o
 	g.inputs = map[string]reflect.Value{}
 	g.outputs = map[string]reflect.Value{}
 	return g
