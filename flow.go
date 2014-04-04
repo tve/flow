@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	// "io/ioutil"
 	"os"
 	"reflect"
 	"runtime"
@@ -116,31 +116,31 @@ func DontPanic() {
 	}
 }
 
-// AddToRegistry adds circuit definitions from a JSON file to the registry.
-func AddToRegistry(filename string) error {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	var definitions map[string]json.RawMessage
-	err = json.Unmarshal(data, &definitions)
-	if err != nil {
-		return err
-	}
-	for name, def := range definitions {
-		registerCircuit(name, def)
-	}
-	return nil
-}
-
-func registerCircuit(name string, def []byte) {
-	Registry[name] = func() Circuitry {
-		g := NewCircuit()
-		err := g.LoadJSON(def)
-		Check(err)
-		return g
-	}
-}
+// // AddToRegistry adds circuit definitions from a JSON file to the registry.
+// func AddToRegistry(filename string) error {
+// 	data, err := ioutil.ReadFile(filename)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	var definitions map[string]json.RawMessage
+// 	err = json.Unmarshal(data, &definitions)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for name, def := range definitions {
+// 		registerCircuit(name, def)
+// 	}
+// 	return nil
+// }
+// 
+// func registerCircuit(name string, def []byte) {
+// 	Registry[name] = func() Circuitry {
+// 		g := NewCircuit()
+// 		err := g.LoadJSON(def)
+// 		Check(err)
+// 		return g
+// 	}
+// }
 
 // Print a compact list of the registry entries on standard output.
 func PrintRegistry() {
