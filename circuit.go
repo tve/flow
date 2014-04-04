@@ -11,6 +11,7 @@ import (
 func NewCircuit() *Circuit {
 	return &Circuit{
 		gadgets: map[string]*Gadget{},
+		wires:   map[string]int{},
 		feeds:   map[string][]Message{},
 		labels:  map[string]string{},
 	}
@@ -20,26 +21,15 @@ func NewCircuit() *Circuit {
 type Circuit struct {
 	Gadget
 
-	gnames  []gadgetDef          // gadgets added by name from the registry
-	gadgets map[string]*Gadget   // gadgets added to this circuit
-	wires   []wireDef            // list of all connections
-	feeds   map[string][]Message // message feeds
-	labels  map[string]string    // pin label lookup map
+	gadgets map[string]*Gadget      // gadgets added to this circuit
+	wires   map[string]int // list of all connections
+	feeds   map[string][]Message    // message feeds
+	labels  map[string]string       // pin label lookup map
+
+	null chan Message // used for dangling inputs
+	sink chan Message // used for dangling outputs
 
 	wait sync.WaitGroup // tracks number of running gadgets
-}
-
-// definition of one named gadget
-type gadgetDef struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-}
-
-// definition of one connection
-type wireDef struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
-	Capacity int    `json:"capacity"`
 }
 
 // Add a named gadget to the circuit with a unique name.
@@ -49,7 +39,7 @@ func (c *Circuit) Add(name, gadget string) {
 		glog.Warningln("not found:", gadget)
 		return
 	}
-	c.gnames = append(c.gnames, gadgetDef{name, gadget})
+	// c.gnames = append(c.gnames, gadgetDef{name, gadget})
 	c.AddCircuitry(name, constructor())
 }
 
@@ -72,9 +62,10 @@ func (c *Circuit) gadgetOf(s string) *Gadget {
 
 // Connect an output pin with an input pin.
 func (c *Circuit) Connect(from, to string, capacity int) {
-	c.wires = append(c.wires, wireDef{from, to, capacity})
-	w := c.gadgetOf(to).getInput(pinPart(to), capacity)
-	c.gadgetOf(from).setOutput(pinPart(from), w)
+	// c.wires = append(c.wires, wireDef{from, to, capacity})
+	// w := c.gadgetOf(to).getInput(pinPart(to), capacity)
+	// c.gadgetOf(from).setOutput(pinPart(from), w)
+	c.wires[from+"/"+to] = capacity
 }
 
 // Set up a message to feed to a gadget on startup.
@@ -96,49 +87,4 @@ func (c *Circuit) Run() {
 		g.launch()
 	}
 	c.wait.Wait()
-}
-
-// Return a description of this circuit in serialisable form.
-func (c *Circuit) Describe() interface{} {
-	desc := map[string]interface{}{}
-	if len(c.gnames) > 0 {
-		desc["gadgets"] = c.gnames
-	}
-	if len(c.gadgets) > len(c.gnames) {
-		named := map[string]bool{}
-		for _, n := range c.gnames {
-			named[n.Name] = true
-		}
-		unreg := []string{}
-		for k := range c.gadgets {
-			if !named[k] {
-				unreg = append(unreg, k)
-			}
-		}
-		desc["unregistered"] = unreg
-	}
-	if len(c.wires) > 0 {
-		desc["wires"] = c.wires
-	}
-	if len(c.feeds) > 0 {
-		expanded := []map[string]Message{}
-		for pin, feeds := range c.feeds {
-			for _, m := range feeds {
-				one := map[string]Message{}
-				if t, ok := m.(Tag); ok {
-					one["tag"] = t.Tag
-					one["data"] = t.Msg
-				} else {
-					one["data"] = m
-				}
-				one["to"] = pin
-				expanded = append(expanded, one)
-			}
-		}
-		desc["feeds"] = expanded
-	}
-	if len(c.labels) > 0 {
-		desc["labels"] = c.labels
-	}
-	return desc
 }

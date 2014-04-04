@@ -2,7 +2,7 @@ package flow
 
 import (
 	"bufio"
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
 	// "io/ioutil"
 	"os"
@@ -57,7 +57,7 @@ type wire struct {
 // func (c *wire) Send(v Message) {
 // 	c.dest.sendTo(c, v)
 // }
-// 
+//
 // func (c *wire) Disconnect() {
 // 	c.senders--
 // 	if c.senders == 0 && c.channel != nil {
@@ -120,7 +120,7 @@ func DontPanic() {
 // 	}
 // 	return nil
 // }
-// 
+//
 // func registerCircuit(name string, def []byte) {
 // 	Registry[name] = func() Circuitry {
 // 		g := NewCircuit()
@@ -150,14 +150,14 @@ func PrintRegistry() {
 	}
 }
 
-// Print a description of a gadget or circuit in indented JSON format.
-func PrintDescription(c Circuitry) {
-	if d, ok := c.(*Circuit); ok {
-		desc, err := json.MarshalIndent(d.Describe(), "", "  ")
-		Check(err)
-		fmt.Println(string(desc))
-	}
-}
+// // Print a description of a gadget or circuit in indented JSON format.
+// func PrintDescription(c Circuitry) {
+// 	if d, ok := c.(*Circuit); ok {
+// 		desc, err := json.MarshalIndent(d.Describe(), "", "  ")
+// 		Check(err)
+// 		fmt.Println(string(desc))
+// 	}
+// }
 
 // LoadConfig parses a configuration file, if it exists, to set up some basic
 // application settings, such as where the app/ and data/ directories are.

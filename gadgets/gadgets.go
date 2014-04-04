@@ -38,13 +38,12 @@ func init() {
 type Sink struct {
 	flow.Gadget
 	In  flow.Input
-	Out flow.Output
 }
 
 // Start reading messages and discard them.
 func (w *Sink) Run() {
-	close(w.Out)
 	for _ = range w.In {
+		// ignore
 	}
 }
 

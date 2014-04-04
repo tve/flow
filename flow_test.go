@@ -16,7 +16,7 @@ func ExampleNewCircuit() {
 // 	upper := flow.Transformer(func(m flow.Message) flow.Message {
 // 		return strings.ToUpper(m.(string))
 // 	})
-// 
+//
 // 	g := flow.NewCircuit()
 // 	g.AddCircuitry("u", upper)
 // 	g.Feed("u.In", "abc")
