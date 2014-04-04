@@ -46,13 +46,13 @@ type Circuitry interface {
 	initPins()
 }
 
-// A wire is a ref-counted Input, it's closed when the count drops to 0.
-type wire struct {
-	channel  chan Message
-	senders  int
-	capacity int
-	dest     *Gadget
-}
+// // A wire is a ref-counted Input, it's closed when the count drops to 0.
+// type wire struct {
+// 	channel  chan Message
+// 	senders  int
+// 	capacity int
+// 	dest     *Gadget
+// }
 
 // func (c *wire) Send(v Message) {
 // 	c.dest.sendTo(c, v)

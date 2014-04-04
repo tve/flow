@@ -7,6 +7,13 @@ import (
 	"github.com/jcw/flow-dev"
 )
 
+func TestTimer(t *testing.T) {
+	g := flow.NewCircuit()
+	g.Add("t", "Timer")
+	g.Feed("t.In", "10ms")
+	g.Run()
+}
+
 func ExamplePrinter() {
 	g := flow.NewCircuit()
 	g.Add("p", "Printer")
@@ -125,13 +132,6 @@ func ExampleReadFileJSON() {
 	// Output:
 	// Lost flow.Tag: {<file> example.json}
 	// Lost map[string]interface {}: map[a:123 b:[3 4 5] c:true]
-}
-
-func TestTimer(t *testing.T) {
-	g := flow.NewCircuit()
-	g.Add("t", "Timer")
-	g.Feed("t.In", "10ms")
-	g.Run()
 }
 
 func ExampleClock() {

@@ -10,6 +10,7 @@ import (
 func ExampleNewCircuit() {
 	g := flow.NewCircuit()
 	g.Run()
+	// Output:
 }
 
 // func ExampleTransformer() {

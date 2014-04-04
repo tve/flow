@@ -102,81 +102,26 @@ func (g *Gadget) initPins() {
 // 	g.outputs[pin] = c
 // }
 
-func (g *Gadget) setupChannels() {
-	// // make sure all the feed wires have also been set up
-	// for dest, msgs := range g.owner.feeds {
-	// 	if gadgetPart(dest) == g.name {
-	// 		g.getInput(dest, len(msgs)) // will add wire to the inputs map
-	// 	}
-	// }
+// func (g *Gadget) setupChannels() {
+// 	// make sure all the feed wires have also been set up
+// 	// set up and pre-fill all the input pins
+// 	// set dangling inputs to null input and dangling outputs to fake sink
+// }
 
-	// // set up and pre-fill all the input pins
-	// for pin, wire := range g.inputs {
-	// 	// create a channel with the proper capacity
-	// 	wire.channel = make(chan Message, wire.capacity)
-	// 	setValue(g.circuitry.pinValue(pin), wire.channel)
-	// 	// fill it with messages from the feed inbox, if any
-	// 	for _, msg := range g.owner.feeds[pin] {
-	// 		wire.channel <- msg
-	// 	}
-	// 	// close the channel if there is no other feed
-	// 	if wire.senders == 0 {
-	// 		close(wire.channel)
-	// 	}
-	// }
+// func (g *Gadget) closeChannels() {
+// 	// close all outputs
+// 	// close all input channels if not nil and not already closed
+// }
 
-	// // set dangling inputs to null input and dangling outputs to fake sink
-	// gadget := g.gadgetValue()
-	// for i := 0; i < gadget.NumField(); i++ {
-	// 	field := gadget.Field(i)
-	// 	switch field.Type().String() {
-	// 	case "flow.Input":
-	// 		if field.IsNil() {
-	// 			null := make(chan Message)
-	// 			close(null)
-	// 			setValue(field, null)
-	// 		}
-	// 	case "flow.Output":
-	// 		if field.IsNil() {
-	// 			// FIXME: setValue(field, &fakeSink{})
-	// 		}
-	// 	}
-	// }
-}
-
-func (g *Gadget) closeChannels() {
-	// for _, wire := range g.outputs {
-	// 	close(wire.channel)
-	// }
-
-	// for _, wire := range g.inputs {
-	// 	// close channel if not nil and not already closed
-	// 	if wire.channel != nil {
-	// 		select {
-	// 		case _, ok := <-wire.channel:
-	// 			if ok {
-	// 				close(wire.channel)
-	// 			}
-	// 		default:
-	// 		}
-	// 	}
-	// 	// setValue(g.circuitry.pinValue(pin), wire.channel)
-	// }
-}
-
-func (g *Gadget) launch() {
-	g.owner.wait.Add(1)
-	g.setupChannels()
-
-	go func() {
-		defer DontPanic()
-		defer g.owner.wait.Done()
-		defer g.closeChannels()
-
-		g.circuitry.Run()
-	}()
-}
-
-func setValue(value reflect.Value, any interface{}) {
-	value.Set(reflect.ValueOf(any))
-}
+// func (g *Gadget) launch() {
+// 	g.owner.wait.Add(1)
+// 	g.setupChannels()
+//
+// 	go func() {
+// 		defer DontPanic()
+// 		defer g.owner.wait.Done()
+// 		defer g.closeChannels()
+//
+// 		g.circuitry.Run()
+// 	}()
+// }
