@@ -39,14 +39,14 @@ type Circuit struct {
 func (c *Circuit) initPins() {
 	// fill c.inputs[]
 	// fill c.outputs[]
-	glog.Errorln("c-initpins", c.name)
+	glog.Infoln("c-initpins", c.name)
 }
 
 // Add a named gadget to the circuit with a unique name.
 func (c *Circuit) Add(name, gadget string) {
 	constructor := Registry[gadget]
 	if constructor == nil {
-		glog.Errorln("not found:", gadget)
+		glog.Warningln("not found:", gadget)
 		return
 	}
 	g := c.AddCircuitry(name, constructor())
@@ -96,18 +96,18 @@ func (c *Circuit) Run() {
 	outbound := map[string]*wire{}
 
 	// start by creating channels large enough to contain the feed data
-	glog.Errorln("c-init", c.name, len(c.feeds))
+	glog.Infoln("c-init", c.name, len(c.feeds))
 	for k, v := range c.feeds {
 		inbound[k] = &wire{channel: make(chan Message, len(v))}
 	}
 
 	// collect all wire endpoints, increasing wire capacities as needed
-	glog.Errorln("wires", c.name, len(c.wires))
+	glog.Infoln("wires", c.name, len(c.wires))
 	for wpair, wcap := range c.wires {
 		v := strings.Split(wpair, "/")
 		from := v[0]
 		to := v[1]
-		glog.Errorln("wire", wpair, wcap)
+		glog.Infoln("wire", wpair, wcap)
 		if _, ok := inbound[to]; !ok {
 			inbound[to] = &wire{}
 		}
@@ -118,78 +118,78 @@ func (c *Circuit) Run() {
 		outbound[from] = in
 	}
 	
-	glog.Errorln("inbound", inbound)
-	glog.Errorln("outbound", outbound)
+	glog.Infoln("inbound", inbound)
+	glog.Infoln("outbound", outbound)
 
 	// push the feed dato into the channels
-	glog.Errorln("feeds", c.name, len(c.feeds))
+	glog.Infoln("feeds", c.name, len(c.feeds))
 	for k, v := range c.feeds {
-		glog.Errorln("feed", k, v)
+		glog.Infoln("feed", k, v)
 		for _, f := range v {
 			inbound[k].channel <- f
 		}
 	}
 
 	// set up an admin channel for communication from gadgets to this circuit
-	glog.Errorln("admin", c.name)
+	glog.Infoln("admin", c.name)
 	c.admin = make(chan Message)
 	count := len(c.gadgets)
 	
 	// set up all the gadgets and start them up
-	glog.Errorln("gadgets", c.name, len(c.gadgets))
+	glog.Infoln("gadgets", c.name, len(c.gadgets))
 	for _, g := range c.gadgets {
 		g.admin = c.admin
 		
-		glog.Errorln("g-in", g.name, len(g.inputs))
+		glog.Infoln("g-in", g.name, len(g.inputs))
 		for k, v := range g.inputs {
 			if in, ok := inbound[g.name + "." + k]; ok {
-				glog.Errorln("inpin", k)
+				glog.Infoln("inpin", k)
 				setPin(v, in.channel)
 			} else {
-				glog.Errorln("null", k)
+				glog.Infoln("null", k)
 				setPin(v, nullChan) // feed eof to unconnected inputs
 			}
 		}
 
-		glog.Errorln("g-out", g.name, len(g.outputs))
+		glog.Infoln("g-out", g.name, len(g.outputs))
 		for k, v := range g.outputs {
 			if out, ok := outbound[g.name + "." + k]; ok {
 				out.fanIn++
-				glog.Errorln("outpin", k, out.fanIn)
+				glog.Infoln("outpin", k, out.fanIn)
 				setPin(v, out.channel)
 			} else {
-				glog.Errorln("sink", k)
+				glog.Infoln("sink", k)
 				setPin(v, c.admin) // ignore data from unconnected outputs
 			}
 		}
 
-		glog.Errorln("g-close", g.name)
+		glog.Infoln("g-close", g.name)
 		for _, in := range inbound {
 			if in.fanIn == 0 {
 				close(in.channel)
 			}
 		}
 
-		glog.Errorln("g-go", g.name)
+		glog.Infoln("g-go", g.name)
 		go func() {
 			defer DontPanic()
 			defer func() {
 				c.admin <- adminMsg{g: g}
 			}()
 
-			glog.Errorln("g-run", g.name)
+			glog.Infoln("g-run", g.name)
 			g.circuitry.Run()
-			glog.Errorln("g-end", g.name)
+			glog.Infoln("g-end", g.name)
 		}()
 	}
 	
 	// listen for incoming admin requests until all gadgets have finished
 	if count > 0 { // TODO: this check can probably move up
 		for m := range c.admin {
-			glog.Errorln("g-admin", m)
+			glog.Infoln("g-admin", m)
 			if a, ok := m.(adminMsg); ok {
 				// also use for output releases and live circuit rewiring?
-				glog.Errorln("g-finish", a.g.name)
+				glog.Infoln("g-finish", a.g.name)
 				// teardown pins
 				count--
 				if count == 0 {
@@ -197,13 +197,13 @@ func (c *Circuit) Run() {
 				}
 			} else {
 				// all other messages are from unconnected output pins
-				glog.Errorln("lost:", c.name, m)
+				glog.Warningln("lost:", c.name, m)
 				fmt.Printf("Lost %T: %v\n", m, m)
 			}
 		}
 	}
 	
-	glog.Errorln("g-done", c.name)
+	glog.Infoln("g-done", c.name)
 	c.admin = nil // this also marks the circuit as not running
 }
 

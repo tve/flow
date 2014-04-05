@@ -20,10 +20,10 @@ type Gadget struct {
 // Release an output channel, closing it when all refs are gone.
 func (g *Gadget) Release(c Output) {
 	if g.admin != nil {
-		glog.Errorln("release", g.name)
+		glog.Infoln("release", g.name)
 		g.admin <- adminMsg{g: g, o: c}
 	} else {
-		glog.Errorln("close", g.name)
+		glog.Infoln("close", g.name)
 		close(c) // not inside cicuit, assume we should just close the channel
 	}
 }
@@ -41,7 +41,7 @@ func (g *Gadget) initPins() {
 	for i := 0; i < gv.NumField(); i++ {
 		ft := gv.Type().Field(i)
 		fv := gv.Field(i)
-		glog.Errorln("pin", g.name, ft.Name, fv.CanSet())
+		glog.Infoln("pin", g.name, ft.Name, fv.CanSet())
 		switch fv.Type().String() {
 		case "flow.Input":
 			g.inputs[ft.Name] = fv
@@ -50,8 +50,8 @@ func (g *Gadget) initPins() {
 			g.outputs[ft.Name] = fv
 		}
 	}
-	glog.Errorln("inputs", g.inputs)
-	glog.Errorln("outputs", g.outputs)
+	glog.Infoln("inputs", g.inputs)
+	glog.Infoln("outputs", g.outputs)
 }
 
 // func (g *Gadget) gadgetValue() reflect.Value {
