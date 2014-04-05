@@ -17,10 +17,10 @@ type Gadget struct {
 	outputs   map[string]reflect.Value // output pins
 }
 
-// Disconnect an output channel, closing it when all refs are gone.
-func (g *Gadget) Disconnect(c Output) {
+// Release an output channel, closing it when all refs are gone.
+func (g *Gadget) Release(c Output) {
 	if g.admin != nil {
-		glog.Errorln("disconnect", g.name)
+		glog.Errorln("release", g.name)
 		g.admin <- adminMsg{g: g, o: c}
 	} else {
 		glog.Errorln("close", g.name)
@@ -41,9 +41,11 @@ func (g *Gadget) initPins() {
 	for i := 0; i < gv.NumField(); i++ {
 		ft := gv.Type().Field(i)
 		fv := gv.Field(i)
+		glog.Errorln("pin", g.name, ft.Name, fv.CanSet())
 		switch fv.Type().String() {
 		case "flow.Input":
 			g.inputs[ft.Name] = fv
+			// g.inputs[ft.Name] = gv.FieldByName(ft.Name)
 		case "flow.Output":
 			g.outputs[ft.Name] = fv
 		}
@@ -102,28 +104,4 @@ func (g *Gadget) initPins() {
 // 	}
 // 	c.senders++
 // 	g.outputs[pin] = c
-// }
-
-// func (g *Gadget) setupChannels() {
-// 	// make sure all the feed wires have also been set up
-// 	// set up and pre-fill all the input pins
-// 	// set dangling inputs to null input and dangling outputs to fake sink
-// }
-
-// func (g *Gadget) closeChannels() {
-// 	// close all outputs
-// 	// close all input channels if not nil and not already closed
-// }
-
-// func (g *Gadget) launch() {
-// 	g.owner.wait.Add(1)
-// 	g.setupChannels()
-//
-// 	go func() {
-// 		defer DontPanic()
-// 		defer g.owner.wait.Done()
-// 		defer g.closeChannels()
-//
-// 		g.circuitry.Run()
-// 	}()
 // }

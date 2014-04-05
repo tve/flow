@@ -46,25 +46,6 @@ type Circuitry interface {
 	initPins()
 }
 
-// // A wire is a ref-counted Input, it's closed when the count drops to 0.
-// type wire struct {
-// 	channel  chan Message
-// 	senders  int
-// 	capacity int
-// 	dest     *Gadget
-// }
-
-// func (c *wire) Send(v Message) {
-// 	c.dest.sendTo(c, v)
-// }
-//
-// func (c *wire) Disconnect() {
-// 	c.senders--
-// 	if c.senders == 0 && c.channel != nil {
-// 		close(c.channel)
-// 	}
-// }
-
 // // extract "a" from "a.b", panics if there's no dot in the string
 // func gadgetPart(s string) string {
 // 	n := strings.IndexRune(s, '.')

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jcw/flow-dev"
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -118,6 +119,7 @@ type Printer struct {
 func (w *Printer) Run() {
 	for m := range w.In {
 		fmt.Printf("%+v\n", m)
+		glog.Errorln("printer", m)
 	}
 }
 

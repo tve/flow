@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -116,6 +117,9 @@ func (c *Circuit) Run() {
 		}
 		outbound[from] = in
 	}
+	
+	glog.Errorln("inbound", inbound)
+	glog.Errorln("outbound", outbound)
 
 	// push the feed dato into the channels
 	glog.Errorln("feeds", c.name, len(c.feeds))
@@ -138,19 +142,23 @@ func (c *Circuit) Run() {
 		
 		glog.Errorln("g-in", g.name, len(g.inputs))
 		for k, v := range g.inputs {
-			if in, ok := inbound[k]; ok {
+			if in, ok := inbound[g.name + "." + k]; ok {
+				glog.Errorln("inpin", k)
 				setPin(v, in.channel)
 			} else {
+				glog.Errorln("null", k)
 				setPin(v, nullChan) // feed eof to unconnected inputs
 			}
 		}
 
 		glog.Errorln("g-out", g.name, len(g.outputs))
 		for k, v := range g.outputs {
-			if out, ok := outbound[k]; ok {
+			if out, ok := outbound[g.name + "." + k]; ok {
 				out.fanIn++
+				glog.Errorln("outpin", k, out.fanIn)
 				setPin(v, out.channel)
 			} else {
+				glog.Errorln("sink", k)
 				setPin(v, c.admin) // ignore data from unconnected outputs
 			}
 		}
@@ -180,7 +188,7 @@ func (c *Circuit) Run() {
 		for m := range c.admin {
 			glog.Errorln("g-admin", m)
 			if a, ok := m.(adminMsg); ok {
-				// also use for disconnects and live circuit rewiring?
+				// also use for output releases and live circuit rewiring?
 				glog.Errorln("g-finish", a.g.name)
 				// teardown pins
 				count--
@@ -190,6 +198,7 @@ func (c *Circuit) Run() {
 			} else {
 				// all other messages are from unconnected output pins
 				glog.Errorln("lost:", c.name, m)
+				fmt.Printf("Lost %T: %v\n", m, m)
 			}
 		}
 	}
