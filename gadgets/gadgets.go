@@ -136,8 +136,8 @@ func (w *Timer) Run() {
 	if r, ok := <-w.In; ok {
 		rate, err := time.ParseDuration(r.(string))
 		flow.Check(err)
-		t := <-time.After(rate)
-		w.Out <- t
+		<-time.After(rate)
+		w.Out <- r.(string)
 	}
 }
 
@@ -155,9 +155,9 @@ func (w *Clock) Run() {
 		rate, err := time.ParseDuration(r.(string))
 		flow.Check(err)
 		t := time.NewTicker(rate)
-		defer t.Stop()
-		for m := range t.C {
-			w.Out <- m
+		defer t.Stop() // TODO: never happens, no way to stop this!
+		for _ = range t.C {
+			w.Out <- r.(string)
 		}
 	}
 }

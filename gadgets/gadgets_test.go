@@ -2,17 +2,9 @@ package gadgets
 
 import (
 	"os"
-	"testing"
 
 	"github.com/jcw/flow-dev"
 )
-
-func TestTimer(t *testing.T) {
-	g := flow.NewCircuit()
-	g.Add("t", "Timer")
-	g.Feed("t.In", "10ms")
-	g.Run()
-}
 
 func ExamplePrinter() {
 	g := flow.NewCircuit()
@@ -44,33 +36,40 @@ func ExampleCounter() {
 	// Lost int: 1
 }
 
-// func ExampleTimer() {
-// 	g := flow.NewCircuit()
-// 	g.Add("t1", "Timer")
-// 	g.Add("t2", "Timer")
-// 	g.Add("c", "Counter")
-// 	g.Connect("t1.Out", "c.In", 0)
-// 	g.Connect("t2.Out", "c.In", 0)
-// 	g.Feed("t1.In", "10ms")
-// 	g.Feed("t2.In", "20ms")
-// 	g.Run()
-// 	// Output:
-// 	// Lost int: 2
-// }
+func ExampleTimer() {
+	g := flow.NewCircuit()
+	g.Add("t", "Timer")
+	g.Feed("t.In", "10ms")
+	g.Run()
+	// Output:
+	// Lost string: 10ms
+}
 
-// func ExampleAllCircuitries() {
-// 	g := flow.NewCircuit()
-// 	g.Add("clock", "Clock")
-// 	g.Add("counter", "Counter") // returns 0
-// 	g.Add("pipe", "Pipe")
-// 	g.Add("printer", "Printer")
-// 	g.Add("repeater", "Repeater")
-// 	g.Add("sink", "Sink")
-// 	g.Add("timer", "Timer")
-// 	g.Run()
-// 	// Output:
-// 	// Lost int: 0
-// }
+func ExampleTimer_2() {
+	g := flow.NewCircuit()
+	g.Add("t1", "Timer")
+	g.Add("t2", "Timer")
+	g.Feed("t1.In", "20ms")
+	g.Feed("t2.In", "10ms")
+	g.Run()
+	// Output:
+	// Lost string: 10ms
+	// Lost string: 20ms
+}
+
+func ExampleAllCircuitries() {
+	g := flow.NewCircuit()
+	g.Add("clock", "Clock")
+	g.Add("counter", "Counter") // returns 0
+	g.Add("pipe", "Pipe")
+	g.Add("printer", "Printer")
+	g.Add("repeater", "Repeater")
+	g.Add("sink", "Sink")
+	g.Add("timer", "Timer")
+	g.Run()
+	// Output:
+	// Lost int: 0
+}
 
 // func ExampleFanOut() {
 // 	g := flow.NewCircuit()
@@ -88,18 +87,18 @@ func ExampleCounter() {
 // 	// Lost int: 2
 // }
 
-// func ExampleDelay() {
-// 	g := flow.NewCircuit()
-// 	g.Add("d", "Delay")
-// 	g.Add("p", "Printer")
-// 	g.Feed("d.Delay", "10ms")
-// 	g.Feed("d.In", "abc")
-// 	g.Feed("p.In", "def")
-// 	g.Run()
-// 	// Output:
-// 	// def
-// 	// Lost string: abc
-// }
+func ExampleDelay() {
+	g := flow.NewCircuit()
+	g.Add("d", "Delay")
+	g.Add("p", "Printer")
+	g.Feed("d.Delay", "10ms")
+	g.Feed("d.In", "abc")
+	g.Feed("p.In", "def")
+	g.Run()
+	// Output:
+	// def
+	// Lost string: abc
+}
 
 func ExampleTimeStamp() {
 	g := flow.NewCircuit()

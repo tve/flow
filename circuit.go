@@ -140,6 +140,7 @@ func (c *Circuit) Run() {
 	for _, g := range c.gadgets {
 		g.admin = c.admin
 		
+		// set all input pins to a valid channel or source to null channel
 		glog.Infoln("g-in", g.name, len(g.inputs))
 		for k, v := range g.inputs {
 			if in, ok := inbound[g.name + "." + k]; ok {
@@ -151,6 +152,7 @@ func (c *Circuit) Run() {
 			}
 		}
 
+		// set all output pins to a valid channel or sink to admin channel
 		glog.Infoln("g-out", g.name, len(g.outputs))
 		for k, v := range g.outputs {
 			if out, ok := outbound[g.name + "." + k]; ok {
@@ -163,15 +165,18 @@ func (c *Circuit) Run() {
 			}
 		}
 
+		// close all channels for this gadget which have no outputs feeding in
 		glog.Infoln("g-close", g.name)
-		for _, in := range inbound {
-			if in.fanIn == 0 {
+		for k, in := range inbound {
+			if strings.HasPrefix(k, g.name + ".") && in.fanIn == 0 {
+				glog.Infoln("in-close", k)
 				close(in.channel)
 			}
 		}
 
+		// start the gadget as goroutine
 		glog.Infoln("g-go", g.name)
-		go func() {
+		go func(g *Gadget) {
 			defer DontPanic()
 			defer func() {
 				c.admin <- adminMsg{g: g}
@@ -180,7 +185,7 @@ func (c *Circuit) Run() {
 			glog.Infoln("g-run", g.name)
 			g.circuitry.Run()
 			glog.Infoln("g-end", g.name)
-		}()
+		}(g)
 	}
 	
 	// listen for incoming admin requests until all gadgets have finished
