@@ -51,12 +51,12 @@ func ExampleNewCircuit() {
 // 	wg.Feed("r.Num", 3)
 // 	wg.Label("MyIn", "r.In")
 // 	wg.Label("MyOut", "r.Out")
-// 
+//
 // 	g := flow.NewCircuit()
 // 	g.AddCircuitry("wg", wg)
 // 	g.Feed("wg.MyIn", "abc")
 // 	g.Feed("wg.MyIn", "def")
-// 
+//
 // 	g.Run()
 // 	// Output:
 // 	// Lost string: abc
@@ -72,19 +72,19 @@ func ExampleNewCircuit() {
 // 	g1.Add("p", "Pipe")
 // 	g1.Label("In", "p.In")
 // 	g1.Label("Out", "p.Out")
-// 
+//
 // 	g2 := flow.NewCircuit()
 // 	g2.Add("p", "Pipe")
 // 	g2.Label("In", "p.In")
 // 	g2.Label("Out", "p.Out")
-// 
+//
 // 	g3 := flow.NewCircuit()
 // 	g3.AddCircuitry("g1", g1)
 // 	g3.AddCircuitry("g2", g2)
 // 	g3.Connect("g1.Out", "g2.In", 0)
 // 	g3.Label("In", "g1.In")
 // 	g3.Label("Out", "g2.Out")
-// 
+//
 // 	g := flow.NewCircuit()
 // 	g.Add("p1", "Pipe")
 // 	g.AddCircuitry("g", g3)

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jcw/flow-dev"
 	"github.com/golang/glog"
+	"github.com/jcw/flow-dev"
 )
 
 func init() {

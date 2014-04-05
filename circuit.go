@@ -33,7 +33,6 @@ type Circuit struct {
 	wires   map[string]int       // all wire definitions
 	feeds   map[string][]Message // all message feeds
 	labels  map[string]string    // pin label lookup map
-	admin   chan Message		 // admin channel while running
 }
 
 func (c *Circuit) initPins() {
@@ -117,7 +116,7 @@ func (c *Circuit) Run() {
 		}
 		outbound[from] = in
 	}
-	
+
 	glog.Infoln("inbound", inbound)
 	glog.Infoln("outbound", outbound)
 
@@ -132,18 +131,19 @@ func (c *Circuit) Run() {
 
 	// set up an admin channel for communication from gadgets to this circuit
 	glog.Infoln("admin", c.name)
-	c.admin = make(chan Message)
-	count := len(c.gadgets)
-	
+	admin := make(chan Message)
+	count := 0
+
 	// set up all the gadgets and start them up
 	glog.Infoln("gadgets", c.name, len(c.gadgets))
 	for _, g := range c.gadgets {
-		g.admin = c.admin
-		
-		// set all input pins to a valid channel or source to null channel
+		count++
+		g.admin = admin
+
+		// set all input pins to a valid channel or source from null channel
 		glog.Infoln("g-in", g.name, len(g.inputs))
 		for k, v := range g.inputs {
-			if in, ok := inbound[g.name + "." + k]; ok {
+			if in, ok := inbound[g.name+"."+k]; ok {
 				glog.Infoln("inpin", k)
 				setPin(v, in.channel)
 			} else {
@@ -155,20 +155,20 @@ func (c *Circuit) Run() {
 		// set all output pins to a valid channel or sink to admin channel
 		glog.Infoln("g-out", g.name, len(g.outputs))
 		for k, v := range g.outputs {
-			if out, ok := outbound[g.name + "." + k]; ok {
+			if out, ok := outbound[g.name+"."+k]; ok {
 				out.fanIn++
 				glog.Infoln("outpin", k, out.fanIn)
 				setPin(v, out.channel)
 			} else {
 				glog.Infoln("sink", k)
-				setPin(v, c.admin) // ignore data from unconnected outputs
+				setPin(v, admin) // ignore data from unconnected outputs
 			}
 		}
 
 		// close all channels for this gadget which have no outputs feeding in
 		glog.Infoln("g-close", g.name)
 		for k, in := range inbound {
-			if strings.HasPrefix(k, g.name + ".") && in.fanIn == 0 {
+			if strings.HasPrefix(k, g.name+".") && in.fanIn == 0 {
 				glog.Infoln("in-close", k)
 				close(in.channel)
 			}
@@ -177,39 +177,35 @@ func (c *Circuit) Run() {
 		// start the gadget as goroutine
 		glog.Infoln("g-go", g.name)
 		go func(g *Gadget) {
-			defer DontPanic()
 			defer func() {
-				c.admin <- adminMsg{g: g}
+				admin <- adminMsg{g: g}
 			}()
+			defer DontPanic()
 
 			glog.Infoln("g-run", g.name)
 			g.circuitry.Run()
 			glog.Infoln("g-end", g.name)
 		}(g)
 	}
-	
+
 	// listen for incoming admin requests until all gadgets have finished
-	if count > 0 { // TODO: this check can probably move up
-		for m := range c.admin {
-			glog.Infoln("g-admin", m)
-			if a, ok := m.(adminMsg); ok {
-				// also use for output releases and live circuit rewiring?
-				glog.Infoln("g-finish", a.g.name)
-				// teardown pins
-				count--
-				if count == 0 {
-					close(c.admin) // will terminate the loop
-				}
-			} else {
-				// all other messages are from unconnected output pins
-				glog.Warningln("lost:", c.name, m)
-				fmt.Printf("Lost %T: %v\n", m, m)
-			}
+	for count > 0 {
+		m := <-admin
+		glog.Infoln("g-admin", m)
+		if a, ok := m.(adminMsg); ok {
+			// also use for output pin releases and live circuit rewiring
+			glog.Infoln("g-finish", a.g.name)
+			// teardown pins
+			count-- // will eventually terminate the loop
+		} else {
+			// all other messages are from unconnected output pins
+			glog.Warningln("lost:", c.name, m)
+			fmt.Printf("Lost %T: %v\n", m, m)
 		}
 	}
-	
+
+	// close(admin)
 	glog.Infoln("g-done", c.name)
-	c.admin = nil // this also marks the circuit as not running
 }
 
 func setPin(v reflect.Value, c chan Message) {
