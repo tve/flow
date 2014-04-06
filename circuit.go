@@ -140,28 +140,27 @@ func (c *Circuit) Run() {
 		count++
 		g.admin = admin
 
-		// set all input pins to a valid channel or source from null channel
-		glog.Infoln("g-in", g.name, len(g.inputs))
-		for k, v := range g.inputs {
-			if in, ok := inbound[g.name+"."+k]; ok {
-				glog.Infoln("inpin", k)
-				setPin(v, in.channel)
-			} else {
-				glog.Infoln("null", k)
-				setPin(v, nullChan) // feed eof to unconnected inputs
-			}
-		}
-
-		// set all output pins to a valid channel or sink to admin channel
-		glog.Infoln("g-out", g.name, len(g.outputs))
-		for k, v := range g.outputs {
-			if out, ok := outbound[g.name+"."+k]; ok {
-				out.fanIn++
-				glog.Infoln("outpin", k, out.fanIn)
-				setPin(v, out.channel)
-			} else {
-				glog.Infoln("sink", k)
-				setPin(v, admin) // ignore data from unconnected outputs
+		// set pins to a valid channel, or source from null, or sink to admin
+		glog.Infoln("g-pins", g.name, len(g.pins))
+		for k, v := range g.pins {
+			switch v.Type().String() {
+			case "flow.Input":
+				if in, ok := inbound[g.name+"."+k]; ok {
+					glog.Infoln("inpin", k)
+					setPin(v, in.channel)
+				} else {
+					glog.Infoln("null", k)
+					setPin(v, nullChan) // feed eof to unconnected inputs
+				}
+			case "flow.Output":
+				if out, ok := outbound[g.name+"."+k]; ok {
+					out.fanIn++
+					glog.Infoln("outpin", k, out.fanIn)
+					setPin(v, out.channel)
+				} else {
+					glog.Infoln("sink", k)
+					setPin(v, admin) // ignore data from unconnected outputs
+				}
 			}
 		}
 
