@@ -43,7 +43,7 @@ type Circuitry interface {
 	Run()
 
 	initGadget(Circuitry, string) *Gadget
-	initPins()
+	initPins() map[string]interface{}
 }
 
 // // extract "a" from "a.b", panics if there's no dot in the string

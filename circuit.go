@@ -33,95 +33,54 @@ type Circuit struct {
 	wires   map[string]int       // all wire definitions
 	feeds   map[string][]Message // all message feeds
 	labels  map[string]string    // pin label lookup map
-	groups  map[string]*group    // the actual channel groups
 }
 
-func (c *Circuit) initPins() {
+func (c *Circuit) initPins() map[string]interface{} {
 	glog.Infoln("c-initpins", c.name)
+	gmap := map[string]chan Message{}
+
+	// make sure there is enough room to store all feed messages
+	for in, feed := range c.feeds {
+		gmap[in] = make(chan Message, len(feed))
+	}
+	// first pass assigns a channel to each input pin
+	for wpair, wcap := range c.wires {
+		v := strings.Split(wpair, "/")
+		in := v[1]
+		// increase wire capacity if needed
+		if gmap[in] == nil || wcap > cap(gmap[in]) {
+			gmap[in] = make(chan Message, wcap)
+		}
+	}
+	// second pass assigns the proper channel to all output pins
+	for wpair := range c.wires {
+		v := strings.Split(wpair, "/")
+		out := v[0]
+		if gmap[out] != nil {
+			glog.Fatalln("output already connected", c.name, out)
+		}
+		in := v[1]
+		gmap[out] = gmap[in]
+	}
+	glog.Errorln("gmap", gmap)
+
+	// look up the label definitions
+	pins := map[string]interface{}{}
 	for k, v := range c.labels {
-		c.pins[k] = reflect.ValueOf(v) // string!
+		if gmap[v] == nil {
+			gmap[v] = make(chan Message)
+		}
+		pins[k] = v
 	}
-
-	type ginfo struct{ capa, feed int }
-	gmap := map[string]*ginfo{}
-	for wpair, wcap := range c.wires {
-		v := strings.Split(wpair, "/")
-		from := v[0]
-		to := v[1]
-		if _, ok := gmap[from]; !ok {
-			gmap[from] = &ginfo{capa: wcap}
-		}
-		if _, ok := gmap[to]; !ok {
-			gmap[to] = gmap[from]
-		}
-		if gmap[to] != gmap[from] { // merge to into from, track max capacity
-			for k, v := range gmap {
-				if v == gmap[to] {
-					if v.capa > wcap {
-						wcap = v.capa
-					}
-					gmap[k] = gmap[from]
-				}
-			}
-		}
-		if wcap > gmap[to].capa {
-			gmap[to].capa = wcap
-		}
-	}
-	// increase wire capacities to accept the feeds, if needed
-	for k, v := range c.feeds {
-		if _, ok := gmap[k]; !ok {
-			gmap[k] = &ginfo{}
-		}
-		f := gmap[k]
-		f.feed += len(v)
-		if f.feed > f.capa {
-			f.capa = f.feed
-		}
-	}
-
-	// in := c.groups[to]
-	// if cap(in.channel) < wcap {
-	// 	in.channel = make(chan Message, wcap) // replace with larger one
-	// }
-	// if _, ok := c.groups[from]; !ok {
-	// 	c.groups[from] = in
-	// }
-
-	// start by creating groups large enough to contain the feed data
-	c.groups = map[string]*group{}
-	glog.Infoln("c-init", c.name, len(c.feeds))
-	for k, v := range c.feeds {
-		c.groups[k] = &group{channel: make(chan Message, len(v))}
-	}
-
-	// create all wire groups, increasing channel capacities as needed
-	glog.Infoln("wires", c.name, len(c.wires))
-	for wpair, wcap := range c.wires {
-		v := strings.Split(wpair, "/")
-		from := v[0]
-		to := v[1]
-		glog.Infoln("wire", wpair, wcap)
-		if _, ok := c.groups[to]; !ok {
-			c.groups[to] = &group{}
-		}
-		in := c.groups[to]
-		if cap(in.channel) < wcap {
-			in.channel = make(chan Message, wcap) // replace with larger one
-		}
-		if _, ok := c.groups[from]; !ok {
-			c.groups[from] = in
-		}
-	}
-
-	glog.Infoln("groups", c.groups)
+	glog.Errorln("pins", pins)
+	return pins
 }
 
 // Add a named gadget to the circuit with a unique name.
 func (c *Circuit) Add(name, gadget string) {
 	constructor := Registry[gadget]
 	if constructor == nil {
-		glog.Warningln("not found:", gadget)
+		glog.Errorln("not found", gadget)
 		return
 	}
 	g := c.AddCircuitry(name, constructor())
@@ -129,10 +88,9 @@ func (c *Circuit) Add(name, gadget string) {
 }
 
 // Add a gadget or circuit to the circuit with a unique name.
-func (c *Circuit) AddCircuitry(name string, circ Circuitry) *Gadget {
-	g := circ.initGadget(circ, name)
+func (c *Circuit) AddCircuitry(name string, child Circuitry) *Gadget {
+	g := child.initGadget(child, name)
 	c.gadgets[name] = g
-	circ.initPins()
 	return g
 }
 
@@ -219,10 +177,10 @@ func (c *Circuit) Run() {
 		g.admin = admin
 
 		// set pins to a valid channel, or source from null, or sink to admin
-		glog.Infoln("g-pins", g.name, len(g.pins))
-		for k, v := range g.pins {
-			t := v.Type().String()
-			if t == "string" { // aliased label into the child circuit
+		pins := g.circuitry.initPins()
+		glog.Infoln("g-pins", g.name, len(pins))
+		for k, p := range pins {
+			if s, ok := p.(string); ok { // aliased label into the child circuit
 				// gc := g.circuitry.(*Circuit)
 				// vs := v.Interface().(string)
 				// if in, ok := gc.inbound[vs]; ok {
@@ -233,8 +191,11 @@ func (c *Circuit) Run() {
 				// 	t = "flow.Output"
 				// 	v := reflect.ValueOf(out.channel)
 				// }
-				glog.Errorln("label", t, k, v.CanSet(), v)
+				glog.Errorln("label", s, k)
+				continue
 			}
+			v := p.(reflect.Value)
+			t := v.Type().String()
 			switch t {
 			case "flow.Input":
 				if in, ok := inbound[g.name+"."+k]; ok {

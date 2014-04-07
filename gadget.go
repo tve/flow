@@ -13,7 +13,6 @@ type Gadget struct {
 	name      string                   // name of this gadget in the circuit
 	admin     chan Message             // for communication with owning circuit
 	regType   string                   // type, as listed in the registry
-	pins      map[string]reflect.Value // input and output pins
 }
 
 // Release an output channel, closing it when all refs are gone.
@@ -30,11 +29,11 @@ func (g *Gadget) Release(c Output) {
 func (g *Gadget) initGadget(c Circuitry, n string) *Gadget {
 	g.circuitry = c
 	g.name = n
-	g.pins = map[string]reflect.Value{}
 	return g
 }
 
-func (g *Gadget) initPins() {
+func (g *Gadget) initPins() map[string]interface{} {
+	pins := map[string]interface{}{} // input and output pins
 	gv := reflect.ValueOf(g.circuitry).Elem()
 	for i := 0; i < gv.NumField(); i++ {
 		ft := gv.Type().Field(i)
@@ -42,10 +41,11 @@ func (g *Gadget) initPins() {
 		glog.Infoln("pin", g.name, ft.Name, fv.CanSet())
 		switch fv.Type().String() {
 		case "flow.Input", "flow.Output":
-			g.pins[ft.Name] = fv
+			pins[ft.Name] = fv
 		}
 	}
-	glog.Infoln("pins", g.pins)
+	glog.Infoln("pins", pins)
+	return pins
 }
 
 // func (g *Gadget) gadgetValue() reflect.Value {
