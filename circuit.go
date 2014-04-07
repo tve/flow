@@ -35,51 +35,20 @@ type Circuit struct {
 	labels  map[string]string    // pin label lookup map
 }
 
-func (c *Circuit) initPins() map[string]interface{} {
-	glog.Errorln("c-initpins", c.name)
-	// gmap := map[string]chan Message{}
-
-	// // make sure there is enough room to store all feed messages
-	// for in, feed := range c.feeds {
-	// 	gmap[in] = make(chan Message, len(feed))
-	// }
-	// // first pass assigns a channel to each input pin
-	// for wpair, wcap := range c.wires {
-	// 	v := strings.Split(wpair, "/")
-	// 	in := v[1]
-	// 	// increase wire capacity if needed
-	// 	if gmap[in] == nil || wcap > cap(gmap[in]) {
-	// 		gmap[in] = make(chan Message, wcap)
-	// 	}
-	// }
-	// // second pass assigns the proper channel to all output pins
-	// for wpair := range c.wires {
-	// 	v := strings.Split(wpair, "/")
-	// 	out := v[0]
-	// 	if gmap[out] != nil {
-	// 		glog.Fatalln("output already connected", c.name, out)
-	// 	}
-	// 	in := v[1]
-	// 	gmap[out] = gmap[in]
-	// }
-	// glog.Errorln("gmap", gmap)
-
-	// look up the label definitions
-	pins := map[string]interface{}{}
+func (c *Circuit) initPins(channels wiring) {
 	for k, v := range c.labels {
-	// for k := range c.labels {
-		// if gmap[v] == nil {
-		// 	gmap[v] = make(chan Message)
-		// }
-		pins[k] = v
-		// pins[k] = c.pinValue(k)
+		fv := c.pinValue(k)
+		ch := channels[v]
+		glog.Errorln("c-hup", c.name, k, v, ch, cap(ch))
+		if ch != nil {
+			ch = nullChan
+		}
+		setPin(fv, ch)
 	}
-	// glog.Errorln("pins", pins)
-	return pins
 }
 
 func (c *Circuit) pinValue(pin string) reflect.Value {
-	glog.Errorln("pv", pin)
+	glog.Errorln("pv", pin, c.labels[pin])
 	p := strings.SplitN(c.labels[pin], ".", 2)
 	return c.gadgets[p[0]].pinValue(p[1]) // recursive
 }
@@ -164,7 +133,7 @@ func (c *Circuit) Run() {
 	glog.Infoln("inbound", inbound)
 	glog.Infoln("outbound", outbound)
 
-	// push the feed dato into the channels
+	// push the feed data into the channels
 	glog.Infoln("feeds", c.name, len(c.feeds))
 	for k, v := range c.feeds {
 		glog.Infoln("feed", k, v)
@@ -173,10 +142,28 @@ func (c *Circuit) Run() {
 		}
 	}
 
+	// close all channels which have no outputs feeding in
+	glog.Infoln("g-close")
+	for k, in := range inbound {
+		if in.fanIn == 0 {
+			glog.Infoln("in-close", k)
+			close(in.channel)
+		}
+	}
+
 	// set up an admin channel for communication from gadgets to this circuit
 	glog.Infoln("admin", c.name)
 	admin := make(chan Message)
 	count := 0
+
+	channels := wiring{"": admin}
+	for k, v := range inbound {
+		channels[k] = v.channel
+	}
+	for k, v := range outbound {
+		channels[k] = v.channel
+	}
+	glog.Errorln("channels", channels)
 
 	// set up all the gadgets and start them up
 	glog.Infoln("gadgets", c.name, len(c.gadgets))
@@ -184,58 +171,7 @@ func (c *Circuit) Run() {
 		count++
 		g.admin = admin
 
-		// set pins to a valid channel, or source from null, or sink to admin
-		pins := g.circuitry.initPins()
-		glog.Errorln("g-pins", g.name, pins)
-		for k := range pins {
-			v := g.circuitry.pinValue(k)
-			// if s, ok := p.(string); ok { // aliased label into the child circuit
-			// 	// gc := g.circuitry.(*Circuit)
-			// 	// vs := v.Interface().(string)
-			// 	// if in, ok := gc.inbound[vs]; ok {
-			// 	// 	t = "flow.Input"
-			// 	// 	v := reflect.ValueOf(in.channel)
-			// 	// }
-			// 	// if out, ok := gc.outbound[vs]; ok {
-			// 	// 	t = "flow.Output"
-			// 	// 	v := reflect.ValueOf(out.channel)
-			// 	// }
-			// 	glog.Errorln("label", s, k)
-			// 	continue
-			// }
-			// v := p.(reflect.Value)
-			t := v.Type().String()
-			switch t {
-			case "flow.Input":
-				if in, ok := inbound[g.name+"."+k]; ok {
-					glog.Infoln("inpin", k)
-					setPin(v, in.channel)
-				} else {
-					glog.Infoln("null", k)
-					setPin(v, nullChan) // feed eof to unconnected inputs
-				}
-			case "flow.Output":
-				if out, ok := outbound[g.name+"."+k]; ok {
-					out.fanIn++
-					glog.Infoln("outpin", k, out.fanIn)
-					setPin(v, out.channel)
-				} else {
-					glog.Infoln("sink", k)
-					setPin(v, admin) // ignore data from unconnected outputs
-				}
-			default:
-				glog.Errorln("pt?", k, t)
-			}
-		}
-
-		// close all channels for this gadget which have no outputs feeding in
-		glog.Infoln("g-close", g.name)
-		for k, in := range inbound {
-			if strings.HasPrefix(k, g.name+".") && in.fanIn == 0 {
-				glog.Infoln("in-close", k)
-				close(in.channel)
-			}
-		}
+		g.circuitry.initPins(channels)
 
 		// start the gadget as goroutine
 		glog.Infoln("g-go", g.name)

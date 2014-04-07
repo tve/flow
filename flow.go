@@ -43,9 +43,11 @@ type Circuitry interface {
 	Run()
 
 	initGadget(Circuitry, string) *Gadget
-	initPins() map[string]interface{}
+	initPins(wiring)
 	pinValue(name string) reflect.Value
 }
+
+type wiring map[string]chan Message
 
 // // extract "a" from "a.b", panics if there's no dot in the string
 // func gadgetPart(s string) string {

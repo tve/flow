@@ -32,20 +32,26 @@ func (g *Gadget) initGadget(c Circuitry, n string) *Gadget {
 	return g
 }
 
-func (g *Gadget) initPins() map[string]interface{} {
-	pins := map[string]interface{}{} // input and output pins
+func (g *Gadget) initPins(channels wiring) {
 	gv := reflect.ValueOf(g.circuitry).Elem()
 	for i := 0; i < gv.NumField(); i++ {
 		ft := gv.Type().Field(i)
+		ch := channels[g.name + "." + ft.Name]
+		glog.Errorln("g-hup", g.name, ft.Name, ch, cap(ch))
 		fv := gv.Field(i)
-		glog.Infoln("pin", g.name, ft.Name, fv.CanSet())
 		switch fv.Type().String() {
-		case "flow.Input", "flow.Output":
-			pins[ft.Name] = fv
+		case "flow.Input":
+			if ch == nil {
+				ch = nullChan
+			}
+			setPin(fv, ch)
+		case "flow.Output":
+			if ch == nil {
+				ch = channels[""] // special admin channel, used as sink
+			}
+			setPin(fv, ch)
 		}
 	}
-	glog.Infoln("pins", pins)
-	return pins
 }
 
 func (g *Gadget) pinValue(pin string) reflect.Value {
@@ -55,55 +61,3 @@ func (g *Gadget) pinValue(pin string) reflect.Value {
 	}
 	return fv
 }
-
-// func (g *Gadget) gadgetValue() reflect.Value {
-// 	return reflect.ValueOf(g.circuitry).Elem()
-// }
-
-// func (g *Gadget) pinValue(pin string) reflect.Value {
-// 	pp := pinPart(pin)
-// 	// if it's a circuit, look up mapped pins
-// 	if g, ok := g.circuitry.(*Circuit); ok {
-// 		p := g.labels[pp]
-// 		return g.gadgetOf(p).circuitry.pinValue(p) // recursive
-// 	}
-// 	fv := g.gadgetValue().FieldByName(pp)
-// 	if !fv.IsValid() {
-// 		glog.Fatalln("pin not found:", pin)
-// 	}
-// 	return fv
-// }
-
-// func (g *Gadget) getInput(pin string, capacity int) *wire {
-// 	c := g.inputs[pin]
-// 	if c == nil {
-// 		c = &wire{channel: make(chan Message, capacity), dest: g}
-// 		g.inputs[pin] = c
-// 	}
-// 	if capacity > c.capacity {
-// 		c.capacity = capacity
-// 	}
-// 	return c
-// }
-
-// func (g *Gadget) setOutput(pin string, c *wire) {
-// 	ppfv := strings.Split(pin, ":")
-// 	fp := g.circuitry.pinValue(ppfv[0])
-// 	if len(ppfv) == 1 {
-// 		if !fp.IsNil() {
-// 			glog.Fatalf("output already connected: %s.%s", g.name, pin)
-// 		}
-// 		setValue(fp, c)
-// 	} else { // it's not an Output, so it must be a map[string]Output
-// 		if fp.IsNil() {
-// 			setValue(fp, map[string]Output{})
-// 		}
-// 		outputs := fp.Interface().(map[string]Output)
-// 		if _, ok := outputs[ppfv[1]]; ok {
-// 			glog.Fatalf("output already connected: %s.%s", g.name, pin)
-// 		}
-// 		outputs[ppfv[1]] = c.channel
-// 	}
-// 	c.senders++
-// 	g.outputs[pin] = c
-// }
