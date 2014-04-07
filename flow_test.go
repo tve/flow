@@ -44,28 +44,28 @@ func ExampleNewCircuit() {
 // 	// Lost string: DEF
 // }
 
-// func ExampleCircuit_Label() {
-// 	// new circuit to repeat each incoming message three times
-// 	wg := flow.NewCircuit()
-// 	wg.Add("r", "Repeater")
-// 	wg.Feed("r.Num", 3)
-// 	wg.Label("MyIn", "r.In")
-// 	wg.Label("MyOut", "r.Out")
-//
-// 	g := flow.NewCircuit()
-// 	g.AddCircuitry("wg", wg)
-// 	g.Feed("wg.MyIn", "abc")
-// 	g.Feed("wg.MyIn", "def")
-//
-// 	g.Run()
-// 	// Output:
-// 	// Lost string: abc
-// 	// Lost string: abc
-// 	// Lost string: abc
-// 	// Lost string: def
-// 	// Lost string: def
-// 	// Lost string: def
-// }
+func ExampleCircuit_Label() {
+	// new circuit to repeat each incoming message three times
+	wg := flow.NewCircuit()
+	wg.Add("r", "Repeater")
+	wg.Feed("r.Num", 3)
+	wg.Label("MyIn", "r.In")
+	wg.Label("MyOut", "r.Out")
+
+	g := flow.NewCircuit()
+	g.AddCircuitry("wg", wg)
+	g.Feed("wg.MyIn", "abc")
+	g.Feed("wg.MyIn", "def")
+
+	g.Run()
+	// Output:
+	// Lost string: abc
+	// Lost string: abc
+	// Lost string: abc
+	// Lost string: def
+	// Lost string: def
+	// Lost string: def
+}
 
 // func ExampleNestedCircuit() {
 // 	g1 := flow.NewCircuit()

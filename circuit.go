@@ -33,12 +33,88 @@ type Circuit struct {
 	wires   map[string]int       // all wire definitions
 	feeds   map[string][]Message // all message feeds
 	labels  map[string]string    // pin label lookup map
+	groups  map[string]*group    // the actual channel groups
 }
 
 func (c *Circuit) initPins() {
-	// fill c.inputs[]
-	// fill c.outputs[]
 	glog.Infoln("c-initpins", c.name)
+	for k, v := range c.labels {
+		c.pins[k] = reflect.ValueOf(v) // string!
+	}
+
+	type ginfo struct{ capa, feed int }
+	gmap := map[string]*ginfo{}
+	for wpair, wcap := range c.wires {
+		v := strings.Split(wpair, "/")
+		from := v[0]
+		to := v[1]
+		if _, ok := gmap[from]; !ok {
+			gmap[from] = &ginfo{capa: wcap}
+		}
+		if _, ok := gmap[to]; !ok {
+			gmap[to] = gmap[from]
+		}
+		if gmap[to] != gmap[from] { // merge to into from, track max capacity
+			for k, v := range gmap {
+				if v == gmap[to] {
+					if v.capa > wcap {
+						wcap = v.capa
+					}
+					gmap[k] = gmap[from]
+				}
+			}
+		}
+		if wcap > gmap[to].capa {
+			gmap[to].capa = wcap
+		}
+	}
+	// increase wire capacities to accept the feeds, if needed
+	for k, v := range c.feeds {
+		if _, ok := gmap[k]; !ok {
+			gmap[k] = &ginfo{}
+		}
+		f := gmap[k]
+		f.feed += len(v)
+		if f.feed > f.capa {
+			f.capa = f.feed
+		}
+	}
+
+	// in := c.groups[to]
+	// if cap(in.channel) < wcap {
+	// 	in.channel = make(chan Message, wcap) // replace with larger one
+	// }
+	// if _, ok := c.groups[from]; !ok {
+	// 	c.groups[from] = in
+	// }
+
+	// start by creating groups large enough to contain the feed data
+	c.groups = map[string]*group{}
+	glog.Infoln("c-init", c.name, len(c.feeds))
+	for k, v := range c.feeds {
+		c.groups[k] = &group{channel: make(chan Message, len(v))}
+	}
+
+	// create all wire groups, increasing channel capacities as needed
+	glog.Infoln("wires", c.name, len(c.wires))
+	for wpair, wcap := range c.wires {
+		v := strings.Split(wpair, "/")
+		from := v[0]
+		to := v[1]
+		glog.Infoln("wire", wpair, wcap)
+		if _, ok := c.groups[to]; !ok {
+			c.groups[to] = &group{}
+		}
+		in := c.groups[to]
+		if cap(in.channel) < wcap {
+			in.channel = make(chan Message, wcap) // replace with larger one
+		}
+		if _, ok := c.groups[from]; !ok {
+			c.groups[from] = in
+		}
+	}
+
+	glog.Infoln("groups", c.groups)
 }
 
 // Add a named gadget to the circuit with a unique name.
@@ -79,9 +155,11 @@ func (c *Circuit) Label(external, internal string) {
 	c.labels[external] = internal
 }
 
-type wire struct {
-	fanIn   int
-	channel chan Message
+type group struct {
+	fanIn    int          // number of attached output pins
+	fanOut   int          // number of attached input pins
+	capacity int          // channel buffering capacity
+	channel  chan Message // actual channel for this group
 }
 
 type adminMsg struct {
@@ -91,13 +169,13 @@ type adminMsg struct {
 
 // Start up the circuit, and return when it is finished.
 func (c *Circuit) Run() {
-	inbound := map[string]*wire{}
-	outbound := map[string]*wire{}
+	inbound := map[string]*group{}
+	outbound := map[string]*group{}
 
 	// start by creating channels large enough to contain the feed data
 	glog.Infoln("c-init", c.name, len(c.feeds))
 	for k, v := range c.feeds {
-		inbound[k] = &wire{channel: make(chan Message, len(v))}
+		inbound[k] = &group{channel: make(chan Message, len(v))}
 	}
 
 	// collect all wire endpoints, increasing wire capacities as needed
@@ -108,7 +186,7 @@ func (c *Circuit) Run() {
 		to := v[1]
 		glog.Infoln("wire", wpair, wcap)
 		if _, ok := inbound[to]; !ok {
-			inbound[to] = &wire{}
+			inbound[to] = &group{}
 		}
 		in := inbound[to]
 		if cap(in.channel) < wcap {
@@ -143,7 +221,21 @@ func (c *Circuit) Run() {
 		// set pins to a valid channel, or source from null, or sink to admin
 		glog.Infoln("g-pins", g.name, len(g.pins))
 		for k, v := range g.pins {
-			switch v.Type().String() {
+			t := v.Type().String()
+			if t == "string" { // aliased label into the child circuit
+				// gc := g.circuitry.(*Circuit)
+				// vs := v.Interface().(string)
+				// if in, ok := gc.inbound[vs]; ok {
+				// 	t = "flow.Input"
+				// 	v := reflect.ValueOf(in.channel)
+				// }
+				// if out, ok := gc.outbound[vs]; ok {
+				// 	t = "flow.Output"
+				// 	v := reflect.ValueOf(out.channel)
+				// }
+				glog.Errorln("label", t, k, v.CanSet(), v)
+			}
+			switch t {
 			case "flow.Input":
 				if in, ok := inbound[g.name+"."+k]; ok {
 					glog.Infoln("inpin", k)
