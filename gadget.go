@@ -9,10 +9,10 @@ import (
 
 // Gadget keeps track of internal details about a gadget.
 type Gadget struct {
-	circuitry Circuitry                // pointer to self as Circuitry object
-	name      string                   // name of this gadget in the circuit
-	admin     chan Message             // for communication with owning circuit
-	regType   string                   // type, as listed in the registry
+	circuitry Circuitry    // pointer to self as Circuitry object
+	name      string       // name of this gadget in the circuit
+	admin     chan Message // for communication with owning circuit
+	regType   string       // type, as listed in the registry
 }
 
 // Release an output channel, closing it when all refs are gone.
@@ -36,8 +36,10 @@ func (g *Gadget) initPins(channels wiring) {
 	gv := reflect.ValueOf(g.circuitry).Elem()
 	for i := 0; i < gv.NumField(); i++ {
 		ft := gv.Type().Field(i)
-		ch := channels[g.name + "." + ft.Name]
-		glog.Errorln("g-hup", g.name, ft.Name, ch, cap(ch))
+		ch := channels[g.name+"."+ft.Name]
+		if ch != nil {
+			glog.Errorln("g-hup", g.name, ft.Name, ch, cap(ch))
+		}
 		fv := gv.Field(i)
 		switch fv.Type().String() {
 		case "flow.Input":

@@ -40,9 +40,8 @@ func (c *Circuit) initPins(channels wiring) {
 		fv := c.pinValue(k)
 		ch := channels[v]
 		if ch == nil {
-			ch = channels[c.name + "." + k]
+			ch = channels[c.name+"."+k]
 		}
-		glog.Errorln("c-hup", c.name, k, v, ch, cap(ch))
 		if ch == nil {
 			switch fv.Type().String() {
 			case "flow.Input":
@@ -50,6 +49,8 @@ func (c *Circuit) initPins(channels wiring) {
 			case "flow.Output":
 				ch = channels[""] // special admin channel used as sink
 			}
+		} else {
+			glog.Errorln("c-hup", c.name, k, v, ch, cap(ch))
 		}
 		setPin(fv, ch)
 	}
@@ -98,11 +99,6 @@ func (c *Circuit) Label(external, internal string) {
 	c.labels[external] = internal
 }
 
-type group struct {
-	fanIn    int          // number of attached output pins
-	channel  chan Message // actual channel for this group
-}
-
 type adminMsg struct {
 	g *Gadget
 	o Output
@@ -110,69 +106,60 @@ type adminMsg struct {
 
 // Start up the circuit, and return when it is finished.
 func (c *Circuit) Run() {
-	inbound := map[string]*group{}
-	outbound := map[string]string{}
+	channels := wiring{}
+	inbound := map[string][]string{}
 
 	// start by creating channels large enough to contain the feed data
 	glog.Infoln("c-init", c.name, len(c.feeds))
 	for k, v := range c.feeds {
-		inbound[k] = &group{channel: make(chan Message, len(v))}
+		channels[k] = make(chan Message, len(v))
 	}
 
 	// collect all wire endpoints, increasing wire capacities as needed
-	glog.Infoln("wires", c.name, len(c.wires))
+	glog.Errorln("wires", c.name, len(c.wires))
 	for wpair, wcap := range c.wires {
 		v := strings.Split(wpair, "/")
 		from := v[0]
 		to := v[1]
 		glog.Infoln("wire", wpair, wcap)
-		if _, ok := inbound[to]; !ok {
-			inbound[to] = &group{}
+		if _, ok := channels[to]; !ok || wcap > cap(channels[to]) {
+			channels[to] = make(chan Message, wcap)
 		}
-		in := inbound[to]
-		if cap(in.channel) < wcap {
-			in.channel = make(chan Message, wcap) // replace with larger one
-		}
-		outbound[from] = to
+		inbound[to] = append(inbound[to], from)
 	}
-
-	glog.Infoln("inbound", inbound)
-	glog.Infoln("outbound", outbound)
+	glog.Errorln("inbound", c.name, inbound)
 
 	// push the feed data into the channels
 	glog.Infoln("feeds", c.name, len(c.feeds))
 	for k, v := range c.feeds {
 		glog.Infoln("feed", k, v)
 		for _, f := range v {
-			inbound[k].channel <- f
+			channels[k] <- f
 		}
 	}
 
-	// close all channels which have no outputs feeding in
-	glog.Infoln("g-close")
-	for k, in := range inbound {
-		if in.fanIn == 0 {
-			glog.Infoln("in-close", k)
-			close(in.channel)
+	// add all channel inputs, close those which have no outputs feeding in
+	glog.Infoln("g-close", c.name)
+	for to, ch := range channels {
+		if ins, ok := inbound[to]; ok {
+			for _, from := range ins {
+				channels[from] = channels[to]
+			}
+		} else {
+			glog.Errorln("in-close", to, len(ch))
+			close(ch)
 		}
 	}
 
 	// set up an admin channel for communication from gadgets to this circuit
 	glog.Infoln("admin", c.name)
 	admin := make(chan Message)
-	count := 0
-
-	channels := wiring{"": admin}
-	for k, v := range inbound {
-		channels[k] = v.channel
-	}
-	for k, v := range outbound {
-		channels[k] = channels[v]
-	}
+	channels[""] = admin
 	glog.Errorln("channels", channels)
 
 	// set up all the gadgets and start them up
-	glog.Infoln("gadgets", c.name, len(c.gadgets))
+	glog.Errorln("gadgets", c.name, len(c.gadgets))
+	count := 0
 	for _, g := range c.gadgets {
 		count++
 		g.admin = admin
@@ -180,16 +167,16 @@ func (c *Circuit) Run() {
 		g.circuitry.initPins(channels)
 
 		// start the gadget as goroutine
-		glog.Infoln("g-go", g.name)
+		glog.Errorln("g-go", c.name, g.name)
 		go func(g *Gadget) {
 			defer func() {
 				admin <- adminMsg{g: g}
 			}()
 			defer DontPanic()
 
-			glog.Infoln("g-run", g.name)
+			glog.Errorln("g-run", g.name)
 			g.circuitry.Run()
-			glog.Infoln("g-end", g.name)
+			glog.Errorln("g-end", g.name)
 		}(g)
 	}
 
