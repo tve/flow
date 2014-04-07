@@ -39,9 +39,17 @@ func (c *Circuit) initPins(channels wiring) {
 	for k, v := range c.labels {
 		fv := c.pinValue(k)
 		ch := channels[v]
+		if ch == nil {
+			ch = channels[c.name + "." + k]
+		}
 		glog.Errorln("c-hup", c.name, k, v, ch, cap(ch))
-		if ch != nil {
-			ch = nullChan
+		if ch == nil {
+			switch fv.Type().String() {
+			case "flow.Input":
+				ch = nullChan
+			case "flow.Output":
+				ch = channels[""] // special admin channel used as sink
+			}
 		}
 		setPin(fv, ch)
 	}
@@ -92,8 +100,6 @@ func (c *Circuit) Label(external, internal string) {
 
 type group struct {
 	fanIn    int          // number of attached output pins
-	// fanOut   int          // number of attached input pins
-	// capacity int          // channel buffering capacity
 	channel  chan Message // actual channel for this group
 }
 
@@ -105,7 +111,7 @@ type adminMsg struct {
 // Start up the circuit, and return when it is finished.
 func (c *Circuit) Run() {
 	inbound := map[string]*group{}
-	outbound := map[string]*group{}
+	outbound := map[string]string{}
 
 	// start by creating channels large enough to contain the feed data
 	glog.Infoln("c-init", c.name, len(c.feeds))
@@ -127,7 +133,7 @@ func (c *Circuit) Run() {
 		if cap(in.channel) < wcap {
 			in.channel = make(chan Message, wcap) // replace with larger one
 		}
-		outbound[from] = in
+		outbound[from] = to
 	}
 
 	glog.Infoln("inbound", inbound)
@@ -161,7 +167,7 @@ func (c *Circuit) Run() {
 		channels[k] = v.channel
 	}
 	for k, v := range outbound {
-		channels[k] = v.channel
+		channels[k] = channels[v]
 	}
 	glog.Errorln("channels", channels)
 
