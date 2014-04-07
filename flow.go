@@ -6,7 +6,7 @@ import (
 	"fmt"
 	// "io/ioutil"
 	"os"
-	// "reflect"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -44,6 +44,7 @@ type Circuitry interface {
 
 	initGadget(Circuitry, string) *Gadget
 	initPins() map[string]interface{}
+	pinValue(name string) reflect.Value
 }
 
 // // extract "a" from "a.b", panics if there's no dot in the string

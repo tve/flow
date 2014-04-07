@@ -48,6 +48,14 @@ func (g *Gadget) initPins() map[string]interface{} {
 	return pins
 }
 
+func (g *Gadget) pinValue(pin string) reflect.Value {
+	fv := reflect.ValueOf(g.circuitry).Elem().FieldByName(pin)
+	if !fv.IsValid() {
+		glog.Fatalln("pin not found:", pin)
+	}
+	return fv
+}
+
 // func (g *Gadget) gadgetValue() reflect.Value {
 // 	return reflect.ValueOf(g.circuitry).Elem()
 // }
