@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"code.google.com/p/go.exp/fsnotify" // supposedly will be std in Go1.3
 
 	"github.com/jcw/flow"
 	_ "github.com/jcw/flow/gadgets/pipe"
@@ -28,6 +29,7 @@ func init() {
 	flow.Registry["Forever"] = func() flow.Circuitry { return new(Forever) }
 	flow.Registry["Delay"] = func() flow.Circuitry { return new(Delay) }
 	flow.Registry["TimeStamp"] = func() flow.Circuitry { return new(TimeStamp) }
+	flow.Registry["WatchFile"] = func() flow.Circuitry { return new(WatchFile) }
 	flow.Registry["ReadFileText"] = func() flow.Circuitry { return new(ReadFileText) }
 	flow.Registry["ReadFileJSON"] = func() flow.Circuitry { return new(ReadFileJSON) }
 	flow.Registry["EnvVar"] = func() flow.Circuitry { return new(EnvVar) }
@@ -207,6 +209,35 @@ func (w *TimeStamp) Run() {
 	for m := range w.In {
 		w.Out.Send(time.Now())
 		w.Out.Send(m)
+	}
+}
+
+// WatchFile takes strings that are filenames and outputs them unchanged, but then
+// continues to watch the files and if any changes it re-emits the filename. This is
+// useful upsteam of a ReadFile* gadget which will then re-read and re-emint the file
+// contents.
+type WatchFile struct {
+	flow.Gadget
+	In  flow.Input
+	Out flow.Output
+}
+
+// Read filenames, emit them, add to watcher, and then re-emit anytime the watcher fires
+func (w *WatchFile) Run() {
+	watcher, err := fsnotify.NewWatcher()
+	flow.Check(err)
+	for {
+		select {
+		// Got a filename, emit it and add to watcher
+		case m := <-w.In:
+			w.Out.Send(m)
+			if name, ok := m.(string); ok {
+				watcher.Watch(name)
+			}
+		// Event on one of the files, just re-emit the filename
+		case ev := <-watcher.Event:
+			w.Out.Send(ev.Name)
+		}
 	}
 }
 
