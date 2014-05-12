@@ -72,7 +72,7 @@ func (c *wire) Disconnect() {
 type fakeSink struct{}
 
 func (c *fakeSink) Send(m Message) {
-	fmt.Printf("Lost %T: %v\n", m, m)
+	glog.Warningf("Lost %T: %v\n", m, m)
 }
 
 func (c *fakeSink) Disconnect() {}
@@ -100,6 +100,7 @@ func Check(err interface{}) {
 func DontPanic() {
 	// generate a nice stack trace, see https://code.google.com/p/gonicetrace/
 	if e := recover(); e != nil {
+		glog.Errorf("***** PANIC: %v\n", e)
 		fmt.Fprintf(os.Stderr, "\nPANIC: %v\n", e)
 		for skip := 1; skip < 20; skip++ {
 			pc, file, line, ok := runtime.Caller(skip)
@@ -109,6 +110,7 @@ func DontPanic() {
 			if strings.HasSuffix(file, ".go") {
 				name := runtime.FuncForPC(pc).Name()
 				name = name[strings.LastIndex(name, "/")+1:]
+				glog.Errorf("%s:%d %s()\n", file, line, name)
 				fmt.Fprintf(os.Stderr, "%s:%d %s()\n", file, line, name)
 			}
 		}

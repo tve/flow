@@ -98,6 +98,11 @@ func (c *Circuit) Run() {
 	c.wait.Wait()
 }
 
+// Start up one gadget in the circuit, useful after dynamically ading a gadget
+func (c *Circuit) RunGadget(name string) {
+        c.gadgets[name].launch()
+}
+
 // Return a description of this circuit in serialisable form.
 func (c *Circuit) Describe() interface{} {
 	desc := map[string]interface{}{}

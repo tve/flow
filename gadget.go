@@ -34,6 +34,14 @@ func (g *Gadget) gadgetValue() reflect.Value {
 	return reflect.ValueOf(g.circuitry).Elem()
 }
 
+func (g *Gadget) Owner() *Circuit {
+        return g.owner
+}
+
+func (g *Gadget) Name() string {
+        return g.name
+}
+
 func (g *Gadget) pinValue(pin string) reflect.Value {
 	pp := pinPart(pin)
 	// if it's a circuit, look up mapped pins

@@ -12,6 +12,7 @@ import (
 	"time"
 	"code.google.com/p/go.exp/fsnotify" // supposedly will be std in Go1.3
 
+        "github.com/golang/glog"
 	"github.com/jcw/flow"
 	_ "github.com/jcw/flow/gadgets/pipe"
 
@@ -23,6 +24,7 @@ func init() {
 	flow.Registry["Repeater"] = func() flow.Circuitry { return new(Repeater) }
 	flow.Registry["Counter"] = func() flow.Circuitry { return new(Counter) }
 	flow.Registry["Printer"] = func() flow.Circuitry { return new(Printer) }
+	flow.Registry["DebugLog"] = func() flow.Circuitry { return new(DebugLog) }
 	flow.Registry["Timer"] = func() flow.Circuitry { return new(Timer) }
 	flow.Registry["Clock"] = func() flow.Circuitry { return new(Clock) }
 	flow.Registry["FanOut"] = func() flow.Circuitry { return new(FanOut) }
@@ -110,6 +112,22 @@ type Printer struct {
 func (w *Printer) Run() {
 	for m := range w.In {
 		fmt.Printf("%+v\n", m)
+	}
+}
+
+// DebugLog prints messages it receives into the log and forwards the messages unchanged.
+// The intent is that this can be inserted between any two gadgets for debug purposes.
+type DebugLog struct {
+	flow.Gadget
+	In flow.Input
+	Out flow.Output
+}
+
+// Start logging incoming messages.
+func (w *DebugLog) Run() {
+	for m := range w.In {
+		glog.V(1).Infof("DEBUG: %+v\n", m)
+		w.Out.Send(m)
 	}
 }
 
