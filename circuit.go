@@ -13,6 +13,8 @@ func NewCircuit() *Circuit {
 		gadgets: map[string]*Gadget{},
 		feeds:   map[string][]Message{},
 		labels:  map[string]string{},
+                abort:   make(chan struct{}),
+                abortOnce: new(sync.Once),
 	}
 }
 
@@ -26,7 +28,9 @@ type Circuit struct {
 	feeds   map[string][]Message // message feeds
 	labels  map[string]string    // pin label lookup map
 
-	wait sync.WaitGroup // tracks number of running gadgets
+        abort   chan struct{}        // closing this channel aborts the circuit
+        abortOnce *sync.Once         // ensure we only close the abort channel once
+	wait      sync.WaitGroup     // tracks number of running gadgets
 }
 
 // definition of one named gadget
@@ -56,6 +60,11 @@ func (c *Circuit) Add(name, gadget string) {
 // Add a gadget or circuit to the circuit with a unique name.
 func (c *Circuit) AddCircuitry(name string, g Circuitry) {
 	c.gadgets[name] = g.initGadget(g, name, c)
+        // if we're adding a sub-circuit then inherit the abort channel
+        if cc, ok := g.(*Circuit); ok {
+                cc.abort = c.abort
+                cc.abortOnce = c.abortOnce
+        }
 }
 
 func (c *Circuit) gadgetOf(s string) *Gadget {
@@ -68,6 +77,18 @@ func (c *Circuit) gadgetOf(s string) *Gadget {
 		glog.Fatalln("gadget not found for:", s)
 	}
 	return g
+}
+
+// Return the "to" part of a wire given a "from" part
+func (c *Circuit) DestOf(from string) string {
+        for _, w := range c.wires {
+                glog.V(4).Info(w.From, "==", from)
+                if w.From == from {
+                        return w.To
+                }
+        }
+        glog.Warningln("wire not found:", from)
+        return ""
 }
 
 // Connect an output pin with an input pin.
@@ -101,6 +122,15 @@ func (c *Circuit) Run() {
 // Start up one gadget in the circuit, useful after dynamically ading a gadget
 func (c *Circuit) RunGadget(name string) {
         c.gadgets[name].launch()
+}
+
+// Abort the operation of a circuit
+func (c *Circuit) Abort() {
+        // signal the abort to all gadgets
+        c.abortOnce.Do(func() {
+                close(c.abort)
+                glog.Warningf("Aborting circuit %s", c.name)
+        })
 }
 
 // Return a description of this circuit in serialisable form.

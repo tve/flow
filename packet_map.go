@@ -133,7 +133,10 @@ func (g *pmDispatchHead) Run() {
 	field := ""
 	if p, ok := <-g.Field; ok {
 		field = p.(string)
-	}
+	} else {
+                glog.Warningf("No field to dispatch on specified")
+        }
+        glog.Infof("PacketMapDispatch on field '%s' with prefix '%s'", field, prefix)
 
 	for m := range g.In {
                 glog.V(4).Infof("In: %+v", m)

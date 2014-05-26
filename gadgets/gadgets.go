@@ -38,22 +38,22 @@ func init() {
 	flow.Registry["CmdLine"] = func() flow.Circuitry { return new(CmdLine) }
 	flow.Registry["Concat3"] = func() flow.Circuitry { return new(Concat3) }
 	flow.Registry["AddTag"] = func() flow.Circuitry { return new(AddTag) }
+	flow.Registry["Waiter"] = func() flow.Circuitry { return new(Waiter) }
 }
 
 // A sink eats up all the messages it receives. Registers as "Sink".
 type Sink struct {
 	flow.Gadget
 	In  flow.Input
-	Out flow.Output
 }
 
 // Start reading messages and discard them.
 func (w *Sink) Run() {
-	w.Out.Disconnect()
-	for _ = range w.In {
+        //glog.Infof("Sink %s running", w.Name())
+	for m := range w.In {
+                glog.V(8).Infof("Sinking message %+v", m)
 	}
 }
-
 
 // Repeaters are pipes which repeat each message a number of times.
 // Registers as "Repeater".
@@ -213,6 +213,21 @@ func (g *Delay) Run() {
 		time.Sleep(delay)
 		g.Out.Send(m)
 	}
+}
+
+// Wait for an input on Gate before forwarding from In to Out
+type Waiter struct {
+        flow.Gadget
+        In   flow.Input
+        Gate flow.Input
+        Out  flow.Output
+}
+
+func (w *Waiter) Run() {
+        <-w.Gate
+        for m := range w.In {
+                w.Out.Send(m)
+        }
 }
 
 // Insert a timestamp before each message. Registers as "TimeStamp".

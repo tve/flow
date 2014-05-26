@@ -3,6 +3,7 @@ package flow
 import (
 	"bufio"
 	"encoding/json"
+        "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,8 +38,8 @@ type Input <-chan Message
 
 // Output pins are used to send messages elsewhere.
 type Output interface {
-	Send(v Message) // Send a message through an output pin.
-	Disconnect()    // Disconnect the pin, close channel when last one is gone.
+	Send(v Message) error // Send a message through an output pin.
+	Disconnect()          // Disconnect the pin, close channel when last one is gone.
 }
 
 // Circuitry is the collective name for circuits and gadgets.
@@ -57,8 +58,9 @@ type wire struct {
 	dest     *Gadget
 }
 
-func (c *wire) Send(v Message) {
-	c.dest.sendTo(c, v)
+// Send on a wire, returns ErrClosedOutput if the channel
+func (c *wire) Send(v Message) error {
+	return c.dest.sendTo(c, v)
 }
 
 func (c *wire) Disconnect() {
@@ -68,11 +70,16 @@ func (c *wire) Disconnect() {
 	}
 }
 
+var ErrClosedOutput = errors.New("output is closed")
+
 // Use a fake sink for every output pin not connected to anything else.
 type fakeSink struct{}
 
-func (c *fakeSink) Send(m Message) {
-	glog.Warningf("Lost %T: %v\n", m, m)
+func (c *fakeSink) Send(m Message) error {
+        _, file, line, _ := runtime.Caller(1)
+        file = file[strings.LastIndex(file, "/")+1:]
+	glog.Warningf("Lost %T in %s:%d: %v\n", m, file, line, m)
+        return nil
 }
 
 func (c *fakeSink) Disconnect() {}
@@ -89,32 +96,38 @@ func pinPart(s string) string {
 	return s[n+1:]
 }
 
+// Print a "pretty" backtrace
+func BackTrace() {
+        glog.Error("===== backtrace")
+        for skip := 1; skip < 20; skip++ {
+                pc, file, line, ok := runtime.Caller(skip)
+                if ok && strings.HasSuffix(file, ".go") {
+                        name := runtime.FuncForPC(pc).Name()
+                        name = name[strings.LastIndex(name, "/")+1:]
+                        file = file[strings.LastIndex(file, "/")+1:]
+                        glog.Errorf("%s:%d %s()", file, line, name)
+                        fmt.Fprintf(os.Stderr, "%s:%d %s()\n", file, line, name)
+                }
+        }
+}
+
 // Utility to check for errors, report as fatal error if the arg is not nil.
 func Check(err interface{}) {
 	if err != nil {
+                BackTrace()
 		glog.Fatal(err)
 	}
 }
 
 // Call this as "defer flow.DontPanic()" for a concise stack trace on panics.
-func DontPanic() {
+// The circuit is being passed in so we can Abort() on the circuit
+func DontPanic(c *Circuit) {
 	// generate a nice stack trace, see https://code.google.com/p/gonicetrace/
 	if e := recover(); e != nil {
-		glog.Errorf("***** PANIC: %v\n", e)
+		glog.Errorf("***** PANIC: %v", e)
 		fmt.Fprintf(os.Stderr, "\nPANIC: %v\n", e)
-		for skip := 1; skip < 20; skip++ {
-			pc, file, line, ok := runtime.Caller(skip)
-			if !ok {
-				break
-			}
-			if strings.HasSuffix(file, ".go") {
-				name := runtime.FuncForPC(pc).Name()
-				name = name[strings.LastIndex(name, "/")+1:]
-				glog.Errorf("%s:%d %s()\n", file, line, name)
-				fmt.Fprintf(os.Stderr, "%s:%d %s()\n", file, line, name)
-			}
-		}
-		glog.Error("EXIT")
+                BackTrace()
+                c.Abort()
 	}
 }
 

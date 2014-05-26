@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -13,7 +14,6 @@ type Gadget struct {
 	circuitry Circuitry        // pointer to self as a Circuitry object
 	name      string           // name of this gadget in the circuit
 	owner     *Circuit         // owning circuit
-	alive     bool             // true while running
 	inputs    map[string]*wire // inbound wires
 	outputs   map[string]*wire // outbound wires
 }
@@ -42,6 +42,12 @@ func (g *Gadget) Name() string {
         return g.name
 }
 
+// Abort the operation of the circuit of which the gadget is a member. Typically this is used
+// when there is an error in the output gadget of a circuit.
+func (g *Gadget) Abort() {
+        g.owner.Abort()
+}
+
 func (g *Gadget) pinValue(pin string) reflect.Value {
 	pp := pinPart(pin)
 	// if it's a circuit, look up mapped pins
@@ -51,6 +57,7 @@ func (g *Gadget) pinValue(pin string) reflect.Value {
 	}
 	fv := g.gadgetValue().FieldByName(pp)
 	if !fv.IsValid() {
+                BackTrace()
 		glog.Fatalln("pin not found:", pin)
 	}
 	return fv
@@ -132,72 +139,58 @@ func (g *Gadget) setupChannels() {
 	}
 }
 
-func (g *Gadget) isFinished() bool {
-	for _, wire := range g.inputs {
-		if len(wire.channel) > 0 {
-			return false
-		}
-	}
-	return true
-}
-
 func (g *Gadget) closeChannels() {
+        // close outputs since we won't be outputting anymore
 	for _, wire := range g.outputs {
 		wire.Disconnect()
 	}
-	for _, wire := range g.inputs {
-		// close channel if not nil and not already closed
-		if wire.channel != nil {
-			select {
-			case _, ok := <-wire.channel:
-				if ok {
-					close(wire.channel)
-				}
-			default:
-			}
-		}
-		// setValue(g.circuitry.pinValue(pin), wire.channel)
-	}
+        // don't close input because consumers should never close input channels,
+        // see http://blog.golang.org/pipelines
 }
 
-func (g *Gadget) sendTo(w *wire, v Message) {
-	if !g.alive {
-		g.launch()
-	}
-
-	const reportSlowSends = false
+func (g *Gadget) sendTo(w *wire, v Message) error {
+	const reportSlowSends = true
 	if reportSlowSends {
-		for {
-			select {
-			case w.channel <- v:
-				return // send ok
-			case <-time.After(10 * time.Second):
-				glog.Errorln("send timed out", g.name, v)
-			}
-		}
+                // be optimistic and assume we can just send, this is done because the
+                // timeout timers can use up a lot of memory
+                select {
+                case <-g.owner.abort:
+                        return ErrClosedOutput
+                case w.channel <- v:
+                        return nil // send ok
+                default:
+                }
+                // didn't work, start a timer and try again
+                timer := time.After(1 * time.Second)
+                select {
+                case <-g.owner.abort:
+                        return ErrClosedOutput
+                case w.channel <- v:
+                        return nil // send ok
+                case <-timer:
+                        glog.Errorln("send timed out", g.name, v)
+                        return fmt.Errorf("Send to %s timed out", g.name)
+                }
 	} else {
-		w.channel <- v
+                select {
+                case <-g.owner.abort:
+                        return ErrClosedOutput
+                case w.channel <- v:
+                        return nil // send ok
+                }
 	}
 }
 
 func (g *Gadget) launch() {
-	g.alive = true
 	g.owner.wait.Add(1)
 	g.setupChannels()
 
 	go func() {
-		defer DontPanic()
+		defer DontPanic(g.owner)
 		defer g.owner.wait.Done()
 		defer g.closeChannels()
 
-		// for {
 		g.circuitry.Run()
-		// 	if g.isFinished() {
-		// 		break
-		// 	}
-		// }
-
-		g.alive = false
 	}()
 }
 
